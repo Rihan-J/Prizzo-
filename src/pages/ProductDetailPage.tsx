@@ -23,16 +23,20 @@ export default function ProductDetailPage() {
     const fetchProductDetails = async () => {
       try {
         setLoading(true);
-        // Fetch specific product directly
         const res = await api.get(`/products/${id}`);
-        if (res.data?.success) {
-          setProduct(res.data.product);
+        const payload = res.data?.data || res.data;
+        
+        if (res.data?.success || res.status === 200) {
+          setProduct(payload.product);
 
           // Fetch similar products based on category
-          const category = res.data.product.category;
-          const simRes = await api.get(`/products?category=${category}&limit=6`);
-          if (simRes.data?.success) {
-            setSimilar(simRes.data.products.filter((p: any) => p.id !== id));
+          const category = payload.product?.category;
+          if (category) {
+            const simRes = await api.get(`/products?category=${category}&limit=6`);
+            const simPayload = simRes.data?.data || simRes.data;
+            if (simRes.data?.success || simRes.status === 200) {
+              setSimilar(simPayload.products?.filter((p: any) => p.id !== id) || []);
+            }
           }
         }
       } catch (err) {
