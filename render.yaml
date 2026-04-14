@@ -2,6 +2,7 @@ services:
   - type: web
     name: prizzo-backend
     env: node
+    plan: free
     region: ohio
     rootDir: backend
     buildCommand: npm run render-build
