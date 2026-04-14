@@ -34,7 +34,11 @@ app.use(helmet());
 
 // ─── CORS — Restricted Origins ───
 const allowedOrigins = config.nodeEnv === "production"
-  ? [process.env.CORS_ORIGIN || "https://prizzo.vercel.app"]
+  ? [
+      process.env.CORS_ORIGIN || "https://prizzo-in.vercel.app", 
+      "https://prizzo.vercel.app", 
+      "https://prizzo-chi.vercel.app"
+    ]
   : ["http://localhost:5173"];
 
 app.use(cors({
