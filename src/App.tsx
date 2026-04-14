@@ -27,6 +27,7 @@ import OffersPage from './pages/OffersPage';
 import HelpPage from './pages/HelpPage';
 import VendorDashboard from './pages/VendorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import OrderTrackingPage from './pages/OrderTrackingPage';
 
 function AppRoutes() {
   const { isLoggedIn, isVendor, isAdmin } = useAuth();
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/order-success" element={<OrderSuccessPage />} />
         <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:id" element={<OrderTrackingPage />} />
         <Route path="/wishlist" element={<WishlistPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/profile" element={<ProfilePage />} />

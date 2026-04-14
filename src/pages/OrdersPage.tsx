@@ -15,10 +15,25 @@ const statusConfig: Record<string, { label: string; color: string; bg: string; i
 
 const filterTabs = ['All', 'Active', 'Completed'];
 
+interface OrderItem {
+  id: string;
+  quantity: number;
+  price: number;
+  product?: { name: string };
+}
+interface Order {
+  id: string;
+  status: string;
+  store?: { name: string };
+  items?: OrderItem[];
+  totalAmount: number;
+  createdAt: string;
+}
+
 export default function OrdersPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('All');
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -93,12 +108,13 @@ export default function OrdersPage() {
           </div>
         ) : (
           <>
-            {filteredOrders.map((order: any) => {
+            {filteredOrders.map((order: Order) => {
               const sc = statusConfig[order.status] || statusConfig['CONFIRMED'];
               const Icon = sc.icon;
               return (
                 <motion.div key={order.id} whileTap={{ scale: 0.98 }}
-                  className="bg-white rounded-2xl p-4 shadow-card cursor-pointer">
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                  className="bg-white rounded-2xl p-4 shadow-card cursor-pointer hover:shadow-lg transition-shadow">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-xs text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</p>
@@ -109,7 +125,7 @@ export default function OrdersPage() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-400 mb-2">
-                    {order.items?.map((i: any) => `📦 ${i.product?.name || 'Unknown'} x${i.quantity}`).join(' • ')}
+                    {order.items?.map((i: OrderItem) => `📦 ${i.product?.name || 'Unknown'} x${i.quantity}`).join(' • ')}
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-orange-600">₹{order.totalAmount}</span>

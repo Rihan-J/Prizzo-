@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronRight, LogOut, Heart, MapPin, CreditCard, ShoppingBag, HelpCircle, Settings, Info, User } from 'lucide-react';
+import { ChevronRight, LogOut, Heart, MapPin, CreditCard, ShoppingBag, HelpCircle, Settings, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
@@ -16,7 +16,7 @@ const menuItems = [
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, logout, toggleRole, isVendor } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); };
 
@@ -27,8 +27,8 @@ export default function ProfilePage() {
         <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 6, repeat: Infinity }}
           className="absolute w-40 h-40 bg-white/5 rounded-full -top-10 -right-10" />
         <div className="flex items-center gap-4 relative z-10">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl backdrop-blur-sm">
-            {user?.avatar || '👤'}
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white backdrop-blur-sm">
+            {user?.name ? user.name.charAt(0).toUpperCase() : '👤'}
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">{user?.name || 'Guest'}</h1>
@@ -42,20 +42,7 @@ export default function ProfilePage() {
       </div>
 
       <div className="px-4 -mt-4 relative z-10">
-        {/* Vendor toggle */}
-        <motion.button whileTap={{ scale: 0.98 }} onClick={toggleRole}
-          className="w-full bg-white rounded-2xl p-4 shadow-card flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <span className="text-xl">🏪</span>
-            <div>
-              <p className="text-sm font-semibold">{isVendor ? 'Switch to User Mode' : 'Switch to Vendor Mode'}</p>
-              <p className="text-xs text-gray-400">{isVendor ? 'Browse and shop' : 'Manage your store'}</p>
-            </div>
-          </div>
-          <div className={`w-12 h-6 rounded-full flex items-center px-0.5 transition-colors ${isVendor ? 'bg-orange-500' : 'bg-gray-200'}`}>
-            <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${isVendor ? 'translate-x-6' : 'translate-x-0'}`} />
-          </div>
-        </motion.button>
+
 
         {/* Menu */}
         <div className="bg-white rounded-2xl shadow-card overflow-hidden">
