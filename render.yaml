@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: prizzo-backend
+    env: node
+    region: ohio
+    rootDir: backend
+    buildCommand: npm run render-build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: QUEUE_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        value: "postgresql://neondb_owner:npg_9mQAqj3hgIMz@ep-holy-frost-an0vn6mc-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+      - key: JWT_SECRET
+        value: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET_STRING"
+      - key: REDIS_URL
+        value: "rediss://default:gQAAAAAAAYF4AAIncDI2NDEzOGZhOWY4NDE0ZjcxYTM3ODYwNDNkY2U4ZmYyMXAyOTg2ODA@precious-jaybird-98680.upstash.io:6379"
+      - key: CORS_ORIGIN
+        value: "https://prizzo.vercel.app"
