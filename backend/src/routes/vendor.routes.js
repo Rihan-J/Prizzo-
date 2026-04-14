@@ -7,6 +7,7 @@ const checkVendorApproved = require("../middlewares/vendor-approval.middleware")
 const {
   createStore,
   getVendorStore,
+  updateStore,
   createProduct,
   getVendorProducts,
   updateProduct,
@@ -20,6 +21,7 @@ router.use(authorize("VENDOR"));
 // ─── Store Routes (allowed even before approval — vendor needs to set up store) ───
 router.get("/store", getVendorStore);
 router.post("/store", createStore);
+router.patch("/store", updateStore);
 
 // ─── Product Routes (require vendor approval) ───
 router.post("/products", checkVendorApproved, createProduct);

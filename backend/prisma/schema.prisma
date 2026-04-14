@@ -53,13 +53,14 @@ model Vendor {
 }
 
 model Store {
-  id        String   @id @default(uuid())
-  name      String
-  address   String
-  latitude  Float
-  longitude Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  name               String
+  address            String
+  latitude           Float
+  longitude          Float
+  isLocationVerified Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   vendorId String @unique
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -93,6 +94,7 @@ model Product {
   @@index([category])
   @@index([name])
   @@index([storeId])
+  @@index([storeId, isAvailable, createdAt])
   @@map("products")
 }
 
@@ -147,6 +149,8 @@ model Order {
 
   @@index([userId])
   @@index([storeId])
+  @@index([createdAt])
+  @@index([status])
   @@map("orders")
 }
 

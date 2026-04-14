@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, CheckCircle, Package, Ban, Loader2 } from 'lucide-react';
 import api from '../services/api';
+import { useOrderUpdates } from '../hooks/useSocket';
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
   CONFIRMED: { label: 'Confirmed', color: 'text-blue-600', bg: 'bg-blue-50', icon: CheckCircle },
@@ -19,28 +20,53 @@ export default function OrdersPage() {
   const [tab, setTab] = useState('All');
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('prizzo_token') : null;
+
+  const fetchOrders = async (pageNum: number = 1, append: boolean = false) => {
+    try {
+      if (!append) setLoading(true);
+      const res = await api.get(`/orders/user?page=${pageNum}&limit=10`);
+      const data = res.data?.data || res.data;
+      if (data?.orders) {
+        if (append) {
+          setOrders(prev => [...prev, ...data.orders]);
+        } else {
+          setOrders(data.orders);
+        }
+        const meta = res.data?.meta;
+        setHasMore(meta ? meta.hasMore : data.orders.length >= 10);
+      }
+    } catch (error) {
+      console.error("Failed to fetch orders", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get('/orders/user');
-        if (res.data?.success) {
-          setOrders(res.data.orders);
-        }
-      } catch (error) {
-        console.error("Failed to fetch orders", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
+    fetchOrders(1);
   }, []);
+
+  // ── Real-time order status updates via Socket.IO ──
+  useOrderUpdates(token, (data) => {
+    setOrders(prev => prev.map(o =>
+      o.id === data.orderId ? { ...o, status: data.status } : o
+    ));
+  });
+
+  const loadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchOrders(nextPage, true);
+  };
 
   const filteredOrders = orders.filter(o => {
     if (tab === 'Active') return ['CONFIRMED', 'PREPARING', 'READY'].includes(o.status);
     if (tab === 'Completed') return o.status === 'COMPLETED';
-    return true; // All
+    return true;
   });
 
   return (
@@ -91,7 +117,6 @@ export default function OrdersPage() {
                       <span className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString()}</span>
                     </div>
                   </div>
-                  {/* Timeline for active orders */}
                   {['CONFIRMED', 'PREPARING', 'READY'].includes(order.status) && (
                     <div className="flex items-center gap-0 mt-3">
                       {['CONFIRMED', 'PREPARING', 'READY'].map((step, i) => {
@@ -115,6 +140,13 @@ export default function OrdersPage() {
                 <span className="text-5xl">📦</span>
                 <p className="text-gray-400 mt-4 font-medium">No orders here</p>
               </div>
+            )}
+            {/* Load More */}
+            {hasMore && filteredOrders.length > 0 && (
+              <button onClick={loadMore}
+                className="w-full bg-orange-50 text-orange-600 py-3 rounded-2xl text-sm font-semibold hover:bg-orange-100 transition-colors">
+                Load More Orders
+              </button>
             )}
           </>
         )}

@@ -46,7 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const res = await api.get('/auth/me');
-      setUser(res.data.user);
+      // Handle both new { data: { user } } and old { user } format
+      const userData = res.data?.data?.user || res.data?.user;
+      setUser(userData);
     } catch (err) {
       console.error('Failed to restore session:', err);
       localStorage.removeItem('prizzo_token');
@@ -62,17 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const res = await api.post('/auth/login', { email, password });
-    if (res.data.token) {
-      localStorage.setItem('prizzo_token', res.data.token);
-      setUser(res.data.user);
+    // Handle both new { data: { token, user } } and old { token, user } format
+    const responseData = res.data?.data || res.data;
+    if (responseData.token) {
+      localStorage.setItem('prizzo_token', responseData.token);
+      setUser(responseData.user);
     }
   };
 
   const signup = async (name: string, email: string, password: string, role: string, storeName?: string) => {
     const res = await api.post('/auth/register', { name, email, password, role, storeName });
-    if (res.data.token) {
-      localStorage.setItem('prizzo_token', res.data.token);
-      setUser(res.data.user);
+    const responseData = res.data?.data || res.data;
+    if (responseData.token) {
+      localStorage.setItem('prizzo_token', responseData.token);
+      setUser(responseData.user);
     }
   };
 

@@ -27,13 +27,15 @@ export default function HomePage() {
   // Live Database State
   const [products, setProducts] = useState<any[]>([]);
 
-  // Fetch online products
+  // Fetch online products (served from 30s cache on repeat visits)
   useEffect(() => {
     const fetchHomeData = async () => {
       try {
         const res = await api.get('/products?limit=50');
-        if (res.data?.success) {
-          setProducts(res.data.products);
+        // Handle standardized response format { success, data: { products }, meta }
+        const data = res.data?.data || res.data;
+        if (data?.products) {
+          setProducts(data.products);
         }
       } catch (err) {
         console.error("Failed to load products:", err);

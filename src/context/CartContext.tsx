@@ -1,10 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import api from '../services/api';
+import api, { invalidateClientCache } from '../services/api';
 import { useAuth } from './AuthContext';
 
 export interface CartItem {
-  id: string; // The cart item ID
+  id: string;
   productId: string;
   name: string;
   price: number;
@@ -31,19 +31,45 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user, isVendor, isAdmin } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
   const [cartStoreId, setCartStoreId] = useState<string | null>(null);
   const [cartLoading, setCartLoading] = useState(true);
 
-  const fetchCart = useCallback(async () => {
-    if (!isLoggedIn) {
+  // ── Batched qty update refs ──
+  const pendingUpdates = useRef(new Map<string, number>());
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Helper: sync state from server cart response ──
+  const syncFromServerResponse = useCallback((cartData: any) => {
+    if (!cartData) {
       setItems([]);
       setTotalItems(0);
       setSubtotal(0);
       setCartStoreId(null);
+      return;
+    }
+    const normalizedItems: CartItem[] = cartData.items?.map((item: any) => ({
+      id: item.id,
+      productId: item.productId,
+      name: item.product.name,
+      price: item.product.price,
+      qty: item.quantity,
+      stock: item.product.stock,
+      isAvailable: item.product.isAvailable
+    })) || [];
+
+    setItems(normalizedItems);
+    setSubtotal(cartData.total || 0);
+    setTotalItems(normalizedItems.reduce((acc, curr) => acc + curr.qty, 0));
+    setCartStoreId(cartData.storeId || null);
+  }, []);
+
+  const fetchCart = useCallback(async () => {
+    // Only attempt to fetch cart for 'USER' role
+    if (!user || user.role !== 'USER') {
       setCartLoading(false);
       return;
     }
@@ -51,38 +77,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       setCartLoading(true);
       const res = await api.get('/cart');
-      
-      if (res.data && res.data.cart) {
-        const cartData = res.data.cart;
-        const normalizedItems: CartItem[] = cartData.items?.map((item: any) => ({
-          id: item.id,
-          productId: item.productId,
-          name: item.product.name,
-          price: item.product.price,
-          qty: item.quantity,
-          stock: item.product.stock,
-          isAvailable: item.product.isAvailable
-        })) || [];
-        
-        setItems(normalizedItems);
-        setSubtotal(cartData.total || 0);
-        setTotalItems(normalizedItems.reduce((acc, curr) => acc + curr.qty, 0));
-        setCartStoreId(cartData.storeId || null);
-      } else {
-        setItems([]);
-        setSubtotal(0);
-        setTotalItems(0);
-        setCartStoreId(null);
-      }
+      // Handle new standardized response format
+      const cartData = res.data?.data?.cart || res.data?.cart;
+      syncFromServerResponse(cartData);
     } catch (error) {
       console.error('Failed to fetch cart:', error);
     } finally {
       setCartLoading(false);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, syncFromServerResponse]);
 
   useEffect(() => {
     fetchCart();
+  }, [fetchCart]);
+
+  // ── Flush batched qty updates ──
+  const flushPendingUpdates = useCallback(async () => {
+    const updates = new Map(pendingUpdates.current);
+    pendingUpdates.current.clear();
+
+    for (const [cartItemId, qty] of updates) {
+      try {
+        if (qty <= 0) {
+          await api.delete(`/cart/item/${cartItemId}`);
+        } else {
+          await api.patch(`/cart/item/${cartItemId}`, { quantity: qty });
+        }
+      } catch (error: any) {
+        console.error('Failed to sync qty update', error);
+      }
+    }
+
+    // Sync with server after all updates
+    if (updates.size > 0) {
+      await fetchCart();
+    }
   }, [fetchCart]);
 
   const addItem = async (productId: string, qty: number) => {
@@ -91,40 +120,65 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      await api.post('/cart/add', { productId, quantity: qty });
-      await fetchCart();
+      const res = await api.post('/cart/add', { productId, quantity: qty });
+      // Server now returns updated cart — sync directly
+      const cartData = res.data?.data?.cart || res.data?.cart;
+      if (cartData) {
+        syncFromServerResponse(cartData);
+      } else {
+        await fetchCart();
+      }
+      // Invalidate product cache since stock might have been checked
+      invalidateClientCache('products');
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to add to cart");
+      alert(error.response?.data?.error || error.response?.data?.message || "Failed to add to cart");
     }
   };
 
   const removeItem = async (cartItemId: string) => {
+    // Optimistic removal
+    setItems(prev => prev.filter(i => i.id !== cartItemId));
     try {
-      await api.delete(`/cart/item/${cartItemId}`);
-      await fetchCart();
+      const res = await api.delete(`/cart/item/${cartItemId}`);
+      const cartData = res.data?.data?.cart || res.data?.cart;
+      if (cartData) {
+        syncFromServerResponse(cartData);
+      } else {
+        await fetchCart();
+      }
     } catch (error) {
       console.error('Failed to remove item', error);
+      await fetchCart(); // Rollback by re-fetching
     }
   };
 
   const updateQty = async (cartItemId: string, qty: number) => {
-    if (qty <= 0) { 
-      await removeItem(cartItemId); 
-      return; 
+    if (qty <= 0) {
+      await removeItem(cartItemId);
+      return;
     }
-    
-    try {
-      await api.patch(`/cart/item/${cartItemId}`, { quantity: qty });
-      await fetchCart();
-    } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to update quantity");
-    }
+
+    // Optimistic: update local state immediately
+    setItems(prev => prev.map(i => i.id === cartItemId ? { ...i, qty } : i));
+    setTotalItems(_prev => {
+      const items2 = items.map(i => i.id === cartItemId ? { ...i, qty } : i);
+      return items2.reduce((a, c) => a + c.qty, 0);
+    });
+    setSubtotal(_prev => {
+      const items2 = items.map(i => i.id === cartItemId ? { ...i, qty } : i);
+      return items2.reduce((a, c) => a + c.price * c.qty, 0);
+    });
+
+    // Batch: store latest qty, flush after 500ms of inactivity
+    pendingUpdates.current.set(cartItemId, qty);
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    flushTimer.current = setTimeout(flushPendingUpdates, 500);
   };
 
   const clearCart = async () => {
     try {
       await api.delete('/cart/clear');
-      await fetchCart();
+      syncFromServerResponse(null);
     } catch (error) {
       console.error('Failed to clear cart', error);
     }
@@ -135,19 +189,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
       alert("Your cart is empty.");
       return;
     }
+    // Flush any pending qty updates before checkout
+    if (pendingUpdates.current.size > 0) {
+      if (flushTimer.current) clearTimeout(flushTimer.current);
+      await flushPendingUpdates();
+    }
     try {
       await api.post('/orders');
-      await fetchCart(); // this completely flushes the cart
+      syncFromServerResponse(null);
+      invalidateClientCache('products');
       alert("Order placed successfully!");
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed during checkout");
+      alert(error.response?.data?.error || error.response?.data?.message || "Failed during checkout");
     }
   };
 
   return (
-    <CartContext.Provider value={{ 
+    <CartContext.Provider value={{
       items, addItem, removeItem, updateQty, clearCart, checkout, fetchCart,
-      totalItems, subtotal, totalSavings: 0, cartLoading, cartStoreId 
+      totalItems, subtotal, totalSavings: 0, cartLoading, cartStoreId
     }}>
       {children}
     </CartContext.Provider>

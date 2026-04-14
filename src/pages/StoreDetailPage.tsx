@@ -244,20 +244,28 @@ export default function StoreDetailPage() {
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
   useEffect(() => {
     const fetchStore = async () => {
       try {
         setLoading(true);
         const [storeRes, productsRes] = await Promise.all([
           api.get(`/stores/${id}`),
-          api.get(`/products?storeId=${id}&limit=50`)
+          api.get(`/products?storeId=${id}&limit=20&page=1`)
         ]);
 
-        if (storeRes.data?.success) {
-          setStore(storeRes.data.store);
+        // Handle standardized response format
+        const storeData = storeRes.data?.data || storeRes.data;
+        if (storeData?.store) {
+          setStore(storeData.store);
         }
-        if (productsRes.data?.success) {
-          setStoreProducts(productsRes.data.products);
+        const prodData = productsRes.data?.data || productsRes.data;
+        if (prodData?.products) {
+          setStoreProducts(prodData.products);
+          const meta = productsRes.data?.meta;
+          setHasMore(meta ? meta.hasMore : prodData.products.length >= 20);
         }
       } catch (err) {
         console.error("Failed to load store", err);
@@ -267,6 +275,22 @@ export default function StoreDetailPage() {
     };
     if (id) fetchStore();
   }, [id]);
+
+  const loadMoreProducts = async () => {
+    const nextPage = page + 1;
+    try {
+      const res = await api.get(`/products?storeId=${id}&limit=20&page=${nextPage}`);
+      const data = res.data?.data || res.data;
+      if (data?.products) {
+        setStoreProducts(prev => [...prev, ...data.products]);
+        setPage(nextPage);
+        const meta = res.data?.meta;
+        setHasMore(meta ? meta.hasMore : data.products.length >= 20);
+      }
+    } catch (err) {
+      console.error("Load more products error:", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -397,6 +421,12 @@ export default function StoreDetailPage() {
                 <span className="text-4xl">📦</span>
                 <p className="text-gray-400 text-sm mt-2">No products listed yet</p>
               </div>
+            )}
+            {hasMore && storeProducts.length > 0 && (
+              <button onClick={loadMoreProducts}
+                className="w-full bg-orange-50 text-orange-600 py-3 rounded-2xl text-sm font-semibold hover:bg-orange-100 transition-colors mt-3">
+                Load More Products
+              </button>
             )}
           </div>
 

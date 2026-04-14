@@ -31,9 +31,10 @@ export default function CheckoutPage() {
       setLoading(true);
       const res = await api.post('/orders');
       
-      if (res.data?.success) {
-        const order = res.data.order;
-        // The backend already cleared the cart in DB, but we should sync frontend
+      // Handle standardized response format
+      const data = res.data?.data || res.data;
+      if (data?.order) {
+        const order = data.order;
         await fetchCart(); 
         
         navigate('/order-success', { 
@@ -48,7 +49,7 @@ export default function CheckoutPage() {
         });
       }
     } catch (error: any) {
-      alert(error.response?.data?.message || "Checkout failed. Please try again.");
+      alert(error.response?.data?.error || error.response?.data?.message || "Checkout failed. Please try again.");
     } finally {
       setLoading(false);
     }

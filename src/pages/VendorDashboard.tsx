@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Package, ShoppingBag, Bell, AlertTriangle, Clock, CheckCircle, DollarSign, Plus, X, Edit, Trash2, ToggleLeft, ToggleRight, TrendingUp } from 'lucide-react';
+import { Home, Package, ShoppingBag, Bell, AlertTriangle, Clock, DollarSign, Plus, X, Edit, Trash2, ToggleLeft, ToggleRight, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { useNewOrderAlerts } from '../hooks/useSocket';
 
 const vendorTabs = [
   { id: 'overview', icon: Home, label: 'Overview' },
@@ -17,19 +18,51 @@ export default function VendorDashboard() {
   const [tab, setTab] = useState('overview');
   const [hasStore, setHasStore] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    const checkStore = async () => {
-      try {
-        const res = await api.get('/vendor/store');
-        if (res.data?.success) setHasStore(true);
-      } catch (err: any) {
-        if (err.response?.status === 404) {
-          setHasStore(false);
-        }
+  // ── Shared state: lift data fetching to parent to avoid duplicate calls ──
+  const [orders, setOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [storeId, setStoreId] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('prizzo_token') : null;
+
+  const fetchSharedData = useCallback(async () => {
+    try {
+      setDataLoading(true);
+      const storeRes = await api.get('/vendor/store');
+      const storeData = storeRes.data?.data || storeRes.data;
+      if (storeData?.store) {
+        setHasStore(true);
+        setStoreId(storeData.store.id);
+
+        // Fetch orders and products ONLY after confirming store exists
+        const [ordRes, prdRes] = await Promise.all([
+          api.get('/orders/vendor?limit=50'),
+          api.get('/vendor/products')
+        ]);
+        const ordData = ordRes.data?.data || ordRes.data;
+        const prdData = prdRes.data?.data || prdRes.data;
+        if (ordData?.orders) setOrders(ordData.orders);
+        if (prdData?.products) setProducts(prdData.products);
       }
-    };
-    checkStore();
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setHasStore(false);
+      }
+    } finally {
+      setDataLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchSharedData();
+  }, [fetchSharedData]);
+
+  // ── Socket.IO: Real-time new order alerts ──
+  useNewOrderAlerts(token, storeId, (_data) => {
+    // Refresh orders when a new order comes in
+    fetchSharedData();
+  });
 
   const handleLogout = () => {
     logout();
@@ -59,7 +92,7 @@ export default function VendorDashboard() {
       </div>
 
       {hasStore === false ? (
-        <VendorStoreSetup onCreated={() => setHasStore(true)} />
+        <VendorStoreSetup onCreated={() => fetchSharedData()} />
       ) : (
         <>
           {/* Vendor Nav */}
@@ -76,9 +109,9 @@ export default function VendorDashboard() {
           </div>
 
           <div className="px-4 mt-5">
-            {tab === 'overview' && <VendorOverview />}
-            {tab === 'orders' && <VendorOrders />}
-            {tab === 'products' && <VendorProducts />}
+            {tab === 'overview' && <VendorOverview orders={orders} products={products} loading={dataLoading} />}
+            {tab === 'orders' && <VendorOrders orders={orders} onRefresh={fetchSharedData} />}
+            {tab === 'products' && <VendorProducts products={products} onRefresh={fetchSharedData} />}
           </div>
         </>
       )}
@@ -86,26 +119,7 @@ export default function VendorDashboard() {
   );
 }
 
-function VendorOverview() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ordRes, prdRes] = await Promise.all([
-          api.get('/orders/vendor'),
-          api.get('/vendor/products')
-        ]);
-        if (ordRes.data.success) setOrders(ordRes.data.orders);
-        if (prdRes.data.success) setProducts(prdRes.data.products);
-      } catch (error) {
-        console.error("Failed to fetch overview data", error);
-      }
-    };
-    fetchData();
-  }, []);
-
+function VendorOverview({ orders, products }: { orders: any[]; products: any[]; loading: boolean }) {
   const todaysOrders = orders.slice(0, 5);
   const totalSales = orders
     .filter(o => o.status === 'COMPLETED' || o.status === 'READY')
@@ -174,32 +188,16 @@ function VendorOverview() {
   );
 }
 
-function VendorOrders() {
+function VendorOrders({ orders, onRefresh }: { orders: any[]; onRefresh: () => void }) {
   const [filter, setFilter] = useState('ALL');
-  const [orders, setOrders] = useState<any[]>([]);
   const statusLabels = ['ALL', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED'];
-
-  const fetchOrders = async () => {
-    try {
-      const res = await api.get('/orders/vendor');
-      if (res.data?.success) {
-        setOrders(res.data.orders);
-      }
-    } catch (error) {
-      console.error("Failed to load orders", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-  }, []);
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
       await api.patch(`/orders/${id}/status`, { status: newStatus });
-      await fetchOrders();
+      await onRefresh();
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to update order status");
+      alert(error.response?.data?.error || error.response?.data?.message || "Failed to update order status");
     }
   };
 
@@ -247,11 +245,10 @@ function VendorOrders() {
   );
 }
 
-function VendorProducts() {
+function VendorProducts({ products, onRefresh }: { products: any[]; onRefresh: () => void }) {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -260,19 +257,6 @@ function VendorProducts() {
   const [formProfitMargin, setFormProfitMargin] = useState('');
   const [formStock, setFormStock] = useState('');
   const [formCategory, setFormCategory] = useState('');
-
-  const fetchProducts = async () => {
-    try {
-      const res = await api.get('/vendor/products');
-      if (res.data?.success) setProducts(res.data.products);
-    } catch (error) {
-      console.error("Failed to load products", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
 
   const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -312,10 +296,10 @@ function VendorProducts() {
       } else {
         await api.post('/vendor/products', payload);
       }
-      await fetchProducts();
+      await onRefresh();
       setShowModal(false);
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to save product");
+      alert(error.response?.data?.error || error.response?.data?.message || "Failed to save product");
     }
   };
 
@@ -323,16 +307,16 @@ function VendorProducts() {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
     try {
       await api.delete(`/vendor/products/${id}`);
-      await fetchProducts();
+      await onRefresh();
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to delete product");
+      alert(error.response?.data?.error || error.response?.data?.message || "Failed to delete product");
     }
   };
 
   const toggleStock = async (p: any) => {
     try {
       await api.patch(`/vendor/products/${p.id}`, { isAvailable: !p.isAvailable });
-      await fetchProducts();
+      await onRefresh();
     } catch (error) {
       console.error("Failed to toggle stock", error);
     }
@@ -432,30 +416,32 @@ function VendorProducts() {
   );
 }
 
+// ─── Store Setup with Map Location Picker ──────────────────────────────────────
 function VendorStoreSetup({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Hardcode coordinates for simplicity for now, or use geolocation/map
-  const lat = 19.0760;
-  const lng = 72.8777;
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !address.trim()) return alert("Please fill all details");
-    
+    if (!name.trim()) return alert("Please enter store name.");
+    if (!address.trim()) return alert("Please pick a location or enter address.");
+    if (!lat || !lng) return alert("Please pick your store location on the map.");
+
     setLoading(true);
     try {
-      await api.post('/vendor/store', { 
-        name, 
-        address, 
-        latitude: lat, 
-        longitude: lng 
+      await api.post('/vendor/store', {
+        name,
+        address,
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lng),
       });
       onCreated();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to create store. Request approval first.");
+      alert(err.response?.data?.error || "Failed to create store.");
     } finally {
       setLoading(false);
     }
@@ -468,24 +454,236 @@ function VendorStoreSetup({ onCreated }: { onCreated: () => void }) {
           <span className="text-3xl">🏬</span>
         </div>
         <h2 className="text-xl font-bold text-center text-gray-900 mb-2">Set Up Your Store</h2>
-        <p className="text-sm text-gray-500 text-center mb-6">You need to create your store profile before you can start selling products.</p>
-        
+        <p className="text-sm text-gray-500 text-center mb-6">Create your store profile to start selling products.</p>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase ml-1 mb-1 block">Store/Pharmacy Name</label>
             <input placeholder="Ex: Apollo Pharmacy" value={name} onChange={e => setName(e.target.value)}
               className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400" />
           </div>
+
+          {/* Map Location Picker */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase ml-1 mb-1 block">Store Location</label>
+            <button type="button" onClick={() => setShowMapPicker(true)}
+              className="w-full bg-orange-50 border-2 border-dashed border-orange-200 text-orange-600 py-4 rounded-2xl text-sm font-medium hover:bg-orange-100 transition-colors flex items-center justify-center gap-2">
+              {lat && lng ? '🗺️ Change Location on Map' : '📍 Pick Location on Map'}
+            </button>
+            {lat && lng && (
+              <div className="mt-2 bg-green-50 text-green-700 text-xs px-3 py-2 rounded-lg flex items-center gap-1 font-medium">
+                ✅ Location set: {lat}, {lng}
+              </div>
+            )}
+          </div>
+
+          {/* Address — auto-filled from map pick, editable */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase ml-1 mb-1 block">Store Address</label>
-            <textarea placeholder="Full address of your outlet..." value={address} onChange={e => setAddress(e.target.value)} rows={3}
+            <textarea
+              placeholder={lat ? "Address auto-filled from map. You can edit it." : "Pick a location on the map first, or type manually..."}
+              value={address} onChange={e => setAddress(e.target.value)} rows={2}
               className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
           </div>
-          <button type="submit" disabled={loading}
+
+          <button type="submit" disabled={loading || !name.trim() || !address.trim() || !lat || !lng}
             className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white py-3.5 rounded-2xl font-semibold transition-colors disabled:opacity-75 disabled:cursor-not-allowed">
             {loading ? 'Setting up...' : 'Create Store'}
           </button>
         </form>
+      </div>
+
+      {showMapPicker && (
+        <MapLocationPicker
+          initialLat={lat ? parseFloat(lat) : undefined}
+          initialLng={lng ? parseFloat(lng) : undefined}
+          onPick={(pLat, pLng, pAddr) => {
+            setLat(pLat.toFixed(6));
+            setLng(pLng.toFixed(6));
+            if (pAddr) setAddress(pAddr);
+            setShowMapPicker(false);
+          }}
+          onClose={() => setShowMapPicker(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Embedded Leaflet Map Picker (OpenStreetMap + Nominatim Reverse Geocoding) ──
+function MapLocationPicker({ initialLat, initialLng, onPick, onClose }: {
+  initialLat?: number; initialLng?: number;
+  onPick: (lat: number, lng: number, address: string) => void;
+  onClose: () => void;
+}) {
+  const mapDivRef = React.useRef<HTMLDivElement>(null);
+  const mapObjRef = React.useRef<any>(null);
+  const markerObjRef = React.useRef<any>(null);
+  const [selLat, setSelLat] = useState(initialLat ?? 20.5937);
+  const [selLng, setSelLng] = useState(initialLng ?? 78.9629);
+  const [addr, setAddr] = useState('');
+  const [isReversing, setIsReversing] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [hasSelection, setHasSelection] = useState(!!initialLat);
+
+  // Reverse geocode using free Nominatim API (OpenStreetMap)
+  const doReverse = async (la: number, lo: number) => {
+    setIsReversing(true);
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${la}&lon=${lo}&format=json&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const d = await r.json();
+      if (d.display_name) setAddr(d.display_name);
+    } catch {
+      // Silent fail — user can type address manually
+    } finally {
+      setIsReversing(false);
+    }
+  };
+
+  // Place or move marker on the map
+  const putMarker = (L: any, map: any, la: number, lo: number) => {
+    if (markerObjRef.current) map.removeLayer(markerObjRef.current);
+    const ic = L.divIcon({
+      html: `<div style="background:#f97316;width:40px;height:40px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:18px;">🏪</span></div>`,
+      className: '',
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+    });
+    markerObjRef.current = L.marker([la, lo], { icon: ic }).addTo(map);
+    setSelLat(la);
+    setSelLng(lo);
+    setHasSelection(true);
+    doReverse(la, lo);
+  };
+
+  // Load Leaflet and initialize map
+  useEffect(() => {
+    let mounted = true;
+    const init = async () => {
+      // Load Leaflet CSS
+      if (!document.getElementById('lf-css-pk')) {
+        const lk = document.createElement('link');
+        lk.id = 'lf-css-pk'; lk.rel = 'stylesheet';
+        lk.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(lk);
+      }
+      // Load Leaflet JS if not already loaded
+      if (!(window as any).L) {
+        await new Promise<void>((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          s.onload = () => res();
+          s.onerror = () => rej();
+          document.head.appendChild(s);
+        });
+      }
+      if (!mounted || !mapDivRef.current || mapObjRef.current) return;
+
+      const L = (window as any).L;
+      const zoom = initialLat ? 15 : 5;
+      const map = L.map(mapDivRef.current).setView(
+        [initialLat ?? 20.5937, initialLng ?? 78.9629], zoom
+      );
+      mapObjRef.current = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Place initial marker if we have coordinates
+      if (initialLat && initialLng) {
+        putMarker(L, map, initialLat, initialLng);
+      }
+
+      // Click anywhere on map to place/move marker
+      map.on('click', (e: any) => {
+        putMarker(L, map, e.latlng.lat, e.latlng.lng);
+      });
+    };
+    init();
+    return () => {
+      mounted = false;
+      if (mapObjRef.current) {
+        mapObjRef.current.remove();
+        mapObjRef.current = null;
+      }
+    };
+  }, []);
+
+  // "Go to My Location" — center map on GPS position
+  const goToMyLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const L = (window as any).L;
+        const map = mapObjRef.current;
+        if (map && L) {
+          map.setView([pos.coords.latitude, pos.coords.longitude], 16);
+          putMarker(L, map, pos.coords.latitude, pos.coords.longitude);
+        }
+        setIsLocating(false);
+      },
+      () => setIsLocating(false),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="bg-white w-full md:max-w-2xl md:rounded-3xl rounded-t-3xl overflow-hidden shadow-2xl"
+        style={{ height: '85vh', maxHeight: '700px', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="font-bold text-base">📍 Pick Store Location</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Tap anywhere on the map to set your store</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-lg">✕</button>
+        </div>
+
+        {/* Controls */}
+        <div className="px-4 py-2 flex items-center justify-between bg-gray-50 border-b border-gray-100 flex-shrink-0">
+          <button type="button" onClick={goToMyLocation} disabled={isLocating}
+            className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1">
+            {isLocating ? (
+              <><span className="animate-spin inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full" /> Finding...</>
+            ) : (
+              <>🎯 Go to My Location</>
+            )}
+          </button>
+          {isReversing && <span className="text-xs text-gray-400">🔄 Getting address...</span>}
+        </div>
+
+        {/* Map container */}
+        <div ref={mapDivRef} className="w-full flex-1" />
+
+        {/* Bottom bar — selected address + confirm */}
+        <div className="px-5 py-3 border-t border-gray-100 bg-white flex-shrink-0">
+          {addr ? (
+            <p className="text-xs text-gray-600 mb-2 leading-relaxed" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              📍 {addr}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mb-2">Tap on the map to select your store location</p>
+          )}
+          <button
+            onClick={() => onPick(selLat, selLng, addr)}
+            disabled={!hasSelection}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-2xl font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ✅ Confirm This Location
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -121,7 +121,8 @@ function OverviewTab() {
     const fetchStats = async () => {
       try {
         const res = await api.get('/admin/dashboard');
-        if (res.data?.success) setStats(res.data.stats);
+        const responseData = res.data?.data || res.data;
+        if (res.data?.success) setStats(responseData.stats);
       } catch (err) {
         console.error('Failed to load dashboard stats:', err);
       } finally {
@@ -189,7 +190,8 @@ function VendorsTab() {
   const fetchVendors = async () => {
     try {
       const res = await api.get('/admin/vendors');
-      if (res.data?.success) setVendors(res.data.vendors);
+      const responseData = res.data?.data || res.data;
+      if (res.data?.success) setVendors(responseData.vendors);
     } catch (err) {
       console.error('Failed to load vendors:', err);
     } finally {
@@ -212,16 +214,18 @@ function VendorsTab() {
   };
 
   const resetPassword = async (userId: string) => {
-    const newPassword = window.prompt("Enter new password (min 6 chars):");
+    const newPassword = window.prompt("Enter new password for this vendor (min 6 chars):");
     if (!newPassword) return;
     if (newPassword.length < 6) return alert("Password must be at least 6 characters.");
 
     setResettingPasswordId(userId);
     try {
-      const res = await api.post(`/admin/reset-password/${userId}`, { newPassword });
-      alert(res.data.message);
+      const res = await api.patch(`/admin/users/${userId}/reset-password`, { newPassword });
+      // Backend returns { success, data: null, message: "..." }
+      alert(res.data?.message || "Password reset successfully.");
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to reset password.");
+      // Backend error returns { success: false, data: null, error: "..." }
+      alert(err.response?.data?.error || "Failed to reset password.");
     } finally {
       setResettingPasswordId(null);
     }
@@ -339,20 +343,33 @@ function VendorsTab() {
 function StoresTab() {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStores = async () => {
-      try {
-        const res = await api.get('/admin/stores');
-        if (res.data?.success) setStores(res.data.stores);
-      } catch (err) {
-        console.error('Failed to load stores:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStores();
-  }, []);
+  const fetchStores = async () => {
+    try {
+      const res = await api.get('/admin/stores');
+      const responseData = res.data?.data || res.data;
+      if (res.data?.success) setStores(responseData.stores);
+    } catch (err) {
+      console.error('Failed to load stores:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchStores(); }, []);
+
+  const verifyLocation = async (storeId: string) => {
+    setVerifyingId(storeId);
+    try {
+      await api.patch(`/admin/stores/${storeId}/verify-location`);
+      await fetchStores();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to verify location.");
+    } finally {
+      setVerifyingId(null);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -373,7 +390,7 @@ function StoresTab() {
               <p className="font-semibold text-sm">{s.name}</p>
               <p className="text-xs text-gray-400 mt-0.5">{s.address}</p>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
               {s.vendor?.isVerified ? (
                 <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">Verified</span>
               ) : (
@@ -384,6 +401,44 @@ function StoresTab() {
               )}
             </div>
           </div>
+
+          {/* Location Info */}
+          <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                📍 {s.latitude?.toFixed(4)}, {s.longitude?.toFixed(4)}
+              </span>
+              {s.isLocationVerified ? (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">📌 Location Verified</span>
+              ) : (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">⚠️ Location Unverified</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <a
+                href={`https://www.google.com/maps?q=${s.latitude},${s.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1 bg-blue-50 text-blue-600 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+              >
+                🗺️ View on Map
+              </a>
+              {!s.isLocationVerified && (
+                <button
+                  onClick={() => verifyLocation(s.id)}
+                  disabled={verifyingId === s.id}
+                  className="flex-1 bg-green-500 text-white py-1.5 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  {verifyingId === s.id ? (
+                    <><Loader2 size={12} className="animate-spin" /> Verifying...</>
+                  ) : (
+                    <>✅ Verify Location</>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
             <span className="flex items-center gap-1"><Package size={12} /> {s._count?.products || 0} products</span>
             <span className="flex items-center gap-1"><ShoppingBag size={12} /> {s._count?.orders || 0} orders</span>
@@ -406,9 +461,10 @@ function ProductsTab() {
     try {
       setLoading(true);
       const res = await api.get(`/admin/products?page=${p}&limit=20`);
+      const responseData = res.data?.data || res.data;
       if (res.data?.success) {
-        setProducts(res.data.products);
-        setTotalPages(res.data.totalPages);
+        setProducts(responseData.products);
+        setTotalPages(responseData.totalPages || responseData.meta?.totalPages || 1);
       }
     } catch (err) {
       console.error('Failed to load products:', err);
@@ -488,9 +544,10 @@ function OrdersTab() {
       setLoading(true);
       const query = status && status !== 'ALL' ? `&status=${status}` : '';
       const res = await api.get(`/admin/orders?page=${p}&limit=20${query}`);
+      const responseData = res.data?.data || res.data;
       if (res.data?.success) {
-        setOrders(res.data.orders);
-        setTotalPages(res.data.totalPages);
+        setOrders(responseData.orders);
+        setTotalPages(responseData.totalPages || responseData.meta?.totalPages || 1);
       }
     } catch (err) {
       console.error('Failed to load orders:', err);

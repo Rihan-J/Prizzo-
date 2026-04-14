@@ -1,22 +1,33 @@
 const express = require("express");
 const prisma = require("../config/db");
+const cache = require("../utils/cache");
+const logger = require("../utils/logger");
+const { sendSuccess, sendError } = require("../utils/response");
 const router = express.Router();
 
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Cache store details for 60 seconds
+    const cacheKey = `store:${id}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return sendSuccess(res, 200, cached);
+
     const store = await prisma.store.findUnique({
       where: { id },
     });
 
     if (!store) {
-      return res.status(404).json({ success: false, message: "Store not found" });
+      return sendError(res, 404, "Store not found.");
     }
 
-    return res.status(200).json({ success: true, store });
+    const result = { store };
+    await cache.set(cacheKey, result, 60);
+    return sendSuccess(res, 200, result);
   } catch (error) {
-    console.error("[GetStoreById Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    logger.error({ err: error }, "[GetStoreById Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 });
 

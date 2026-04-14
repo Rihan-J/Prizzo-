@@ -15,6 +15,7 @@ const {
   resetUserPassword,
   getVendorPerformance,
   deleteProduct,
+  verifyStoreLocation,
 } = require("../controllers/admin.controller");
 
 // All admin routes require authentication + ADMIN role
@@ -31,9 +32,12 @@ router.patch("/vendors/:id/reject", rejectVendor);
 router.patch("/vendors/:id/block", blockVendor);
 router.get("/vendor-performance", getVendorPerformance);
 
+// ─── Vendor Password Reset ───
+router.patch("/users/:id/reset-password", resetUserPassword);
+
 // ─── Platform Overview ───
-router.post("/reset-password/:userId", resetUserPassword);
 router.get("/stores", getAllStores);
+router.patch("/stores/:id/verify-location", verifyStoreLocation);
 router.get("/products", getAllProducts);
 router.delete("/products/:id", deleteProduct);
 router.get("/orders", getAllOrders);

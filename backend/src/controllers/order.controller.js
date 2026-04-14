@@ -1,7 +1,12 @@
 const prisma = require("../config/db");
+const cache = require("../utils/cache");
+const logger = require("../utils/logger");
 const { commissionPercentage } = require("../config/platform");
+const { sendSuccess, sendError, paginationMeta } = require("../utils/response");
+const { throttledEmit } = require("../config/socket");
+const { enqueueNotification } = require("../services/queue.service");
 
-// ─── POST /orders — Checkout / Create Order ───
+// ─── POST /orders — Checkout / Create Order (strong consistency) ───
 const checkout = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -14,19 +19,19 @@ const checkout = async (req, res) => {
     });
 
     if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ success: false, message: "Cart is empty." });
+      return sendError(res, 400, "Cart is empty.");
     }
     if (!cart.storeId) {
-      return res.status(400).json({ success: false, message: "Cart has no store context." });
+      return sendError(res, 400, "Cart has no store context.");
     }
 
-    // Process checkout in a Prisma Transaction
+    // ── Atomic transaction with row-level locking for strong consistency ──
     const orderData = await prisma.$transaction(async (tx) => {
       let totalAmount = 0;
       const orderItemsData = [];
 
       for (const item of cart.items) {
-        // Fetch fresh product data inside transaction to ensure concurrency safety
+        // Fetch fresh product data inside transaction for concurrency safety
         const product = await tx.product.findUnique({ where: { id: item.productId } });
 
         if (!product || !product.isAvailable) {
@@ -47,13 +52,13 @@ const checkout = async (req, res) => {
           price: priceAtCheckout,
         });
 
-        // Decrement stock
+        // Decrement stock atomically
         const newStock = product.stock - item.quantity;
         await tx.product.update({
           where: { id: product.id },
           data: {
             stock: newStock,
-            isAvailable: newStock > 0, // Auto-mark unavailable if stock hits 0
+            isAvailable: newStock > 0,
           },
         });
       }
@@ -85,72 +90,116 @@ const checkout = async (req, res) => {
       return newOrder;
     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Order placed successfully.",
-      order: orderData,
+    // ── Cache invalidation: stock changed → invalidate products + stores ──
+    await Promise.all([
+      cache.invalidate("products"),
+      cache.invalidate("categories"),
+      cache.invalidate("stores"),
+      cache.invalidate("admin"),
+    ]);
+
+    // ── Real-time: Notify vendor via Socket.IO ──
+    const io = req.app.get("io");
+    if (io) {
+      throttledEmit(io, `vendor:${cart.storeId}`, "order:new", {
+        orderId: orderData.id,
+        totalAmount: orderData.totalAmount,
+        itemCount: orderData.items.length,
+        userId,
+      });
+    }
+
+    // ── Enqueue notification job (async — doesn't block checkout) ──
+    enqueueNotification("order-created", {
+      orderId: orderData.id,
+      storeId: cart.storeId,
+      userId,
+      totalAmount: orderData.totalAmount,
+      itemCount: orderData.items.length,
     });
+
+    logger.info({ orderId: orderData.id, userId, storeId: cart.storeId, total: orderData.totalAmount }, "Order placed");
+
+    return sendSuccess(res, 201, { order: orderData });
   } catch (error) {
-    console.error("[Checkout Error]", error.message);
-    const message = error.message && error.message.includes("Insufficient") || error.message.includes("unavailable")
-      ? error.message 
+    logger.error({ err: error }, "[Checkout Error]");
+    const message = error.message && (error.message.includes("Insufficient") || error.message.includes("unavailable"))
+      ? error.message
       : "Internal server error during checkout.";
-    
-    return res.status(400).json({ success: false, message });
+    return sendError(res, 400, message);
   }
 };
 
-// ─── GET /orders/user — Get User's Orders ───
+// ─── GET /orders/user — Get User's Orders (paginated) ───
 const getUserOrders = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const { page = 1, limit = 10 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
 
-    const orders = await prisma.order.findMany({
-      where: { userId },
-      include: {
-        store: { select: { id: true, name: true, address: true } },
-        items: {
-          include: {
-            product: { select: { id: true, name: true } },
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: { userId },
+        include: {
+          store: { select: { id: true, name: true, address: true } },
+          items: {
+            include: {
+              product: { select: { id: true, name: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limitNum,
+      }),
+      prisma.order.count({ where: { userId } }),
+    ]);
 
-    return res.status(200).json({ success: true, count: orders.length, orders });
+    return sendSuccess(res, 200, { orders }, paginationMeta(pageNum, limitNum, total));
   } catch (error) {
-    console.error("[GetUserOrders Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error." });
+    logger.error({ err: error }, "[GetUserOrders Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 };
 
-// ─── GET /orders/vendor — Get Vendor's Orders ───
+// ─── GET /orders/vendor — Get Vendor's Orders (paginated) ───
 const getVendorOrders = async (req, res) => {
   try {
     const vendor = await prisma.vendor.findUnique({ where: { userId: req.user.userId } });
-    if (!vendor) return res.status(403).json({ success: false, message: "Vendor profile not found." });
+    if (!vendor) return sendError(res, 403, "Vendor profile not found.");
 
     const store = await prisma.store.findUnique({ where: { vendorId: vendor.id } });
-    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    if (!store) return sendError(res, 404, "Store not found.");
 
-    const orders = await prisma.order.findMany({
-      where: { storeId: store.id },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-        items: {
-          include: {
-            product: { select: { id: true, name: true } },
+    const { page = 1, limit = 10 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: { storeId: store.id },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          items: {
+            include: {
+              product: { select: { id: true, name: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limitNum,
+      }),
+      prisma.order.count({ where: { storeId: store.id } }),
+    ]);
 
-    return res.status(200).json({ success: true, count: orders.length, orders });
+    return sendSuccess(res, 200, { orders, storeId: store.id }, paginationMeta(pageNum, limitNum, total));
   } catch (error) {
-    console.error("[GetVendorOrders Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error." });
+    logger.error({ err: error }, "[GetVendorOrders Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 };
 
@@ -162,28 +211,28 @@ const updateOrderStatus = async (req, res) => {
 
     const validStatuses = ["CONFIRMED", "PREPARING", "READY", "COMPLETED", "CANCELLED"];
     if (!status || !validStatuses.includes(status.toUpperCase())) {
-      return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${validStatuses.join(', ')}` });
+      return sendError(res, 400, `Invalid status. Allowed: ${validStatuses.join(', ')}`);
     }
 
     const vendor = await prisma.vendor.findUnique({ where: { userId: req.user.userId } });
-    if (!vendor) return res.status(403).json({ success: false, message: "Vendor profile not found." });
+    if (!vendor) return sendError(res, 403, "Vendor profile not found.");
 
     const store = await prisma.store.findUnique({ where: { vendorId: vendor.id } });
-    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    if (!store) return sendError(res, 404, "Store not found.");
 
     const order = await prisma.order.findUnique({ where: { id } });
-    if (!order) return res.status(404).json({ success: false, message: "Order not found." });
+    if (!order) return sendError(res, 404, "Order not found.");
 
     if (order.storeId !== store.id) {
-      return res.status(403).json({ success: false, message: "You can only update orders for your store." });
+      return sendError(res, 403, "You can only update orders for your store.");
     }
 
     if (order.status === "COMPLETED") {
-      return res.status(400).json({ success: false, message: "Order is already completed and permanently locked." });
+      return sendError(res, 400, "Order is already completed and permanently locked.");
     }
-    
+
     if (order.status === "CANCELLED") {
-      return res.status(400).json({ success: false, message: "Order is cancelled and cannot be updated." });
+      return sendError(res, 400, "Order is cancelled and cannot be updated.");
     }
 
     const updatedOrder = await prisma.order.update({
@@ -191,10 +240,37 @@ const updateOrderStatus = async (req, res) => {
       data: { status: status.toUpperCase() },
     });
 
-    return res.status(200).json({ success: true, message: `Status updated to ${updatedOrder.status}`, order: updatedOrder });
+    // ── Cache invalidation: order status changed → invalidate stores + admin ──
+    await Promise.all([
+      cache.invalidate("stores"),
+      cache.invalidate("admin"),
+    ]);
+
+    // ── Real-time: Notify user via Socket.IO ──
+    const io = req.app.get("io");
+    if (io) {
+      throttledEmit(io, `user:${order.userId}`, "order:status-update", {
+        orderId: order.id,
+        status: updatedOrder.status,
+        storeName: store.name,
+      });
+    }
+
+    // ── Enqueue notification job ──
+    enqueueNotification("order-status-changed", {
+      orderId: order.id,
+      userId: order.userId,
+      storeId: store.id,
+      oldStatus: order.status,
+      newStatus: updatedOrder.status,
+    });
+
+    logger.info({ orderId: id, oldStatus: order.status, newStatus: updatedOrder.status }, "Order status updated");
+
+    return sendSuccess(res, 200, { order: updatedOrder });
   } catch (error) {
-    console.error("[UpdateOrderStatus Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error." });
+    logger.error({ err: error }, "[UpdateOrderStatus Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 };
 

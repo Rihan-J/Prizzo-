@@ -26,7 +26,7 @@ export default function LoginPage() {
       }
       navigate('/', { replace: true });
     } catch (err: any) {
-      alert("Error: " + (err.response?.data?.message || err.message));
+      alert("Error: " + (err.response?.data?.error || err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }

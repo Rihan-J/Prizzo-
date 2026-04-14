@@ -1,6 +1,9 @@
 const prisma = require("../config/db");
+const cache = require("../utils/cache");
+const logger = require("../utils/logger");
+const { sendSuccess, sendError, paginationMeta } = require("../utils/response");
 
-// ─── GET /products — List All Products (with search & filter) ───
+// ─── GET /products — List All Products (with search & filter + server cache) ───
 const getAllProducts = async (req, res) => {
   try {
     const { query, category, storeId, page = 1, limit = 20 } = req.query;
@@ -8,6 +11,13 @@ const getAllProducts = async (req, res) => {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * limitNum;
+
+    // ── Server-side cache ──
+    const cacheKey = `products:${JSON.stringify({ query, category, storeId, page: pageNum, limit: limitNum })}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return sendSuccess(res, 200, cached.data, cached.meta);
+    }
 
     // ── Build dynamic where clause ──
     const where = { isAvailable: true };
@@ -27,11 +37,21 @@ const getAllProducts = async (req, res) => {
       where.category = category.trim().toLowerCase();
     }
 
-    // ── Fetch products with store info ──
+    // ── Fetch products — select only needed fields for list view ──
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          basePrice: true,
+          profitMargin: true,
+          category: true,
+          stock: true,
+          isAvailable: true,
+          createdAt: true,
+          storeId: true,
           store: {
             select: {
               id: true,
@@ -49,24 +69,26 @@ const getAllProducts = async (req, res) => {
       prisma.product.count({ where }),
     ]);
 
-    return res.status(200).json({
-      success: true,
-      count: products.length,
-      total,
-      page: pageNum,
-      totalPages: Math.ceil(total / limitNum),
-      products,
-    });
+    const meta = paginationMeta(pageNum, limitNum, total);
+    const responseData = { data: { products }, meta };
+    await cache.set(cacheKey, responseData, 30);
+
+    return sendSuccess(res, 200, { products }, meta);
   } catch (error) {
-    console.error("[GetAllProducts Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error." });
+    logger.error({ err: error }, "[GetAllProducts Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 };
 
-// ─── GET /products/:id — Get Single Product ───
+// ─── GET /products/:id — Get Single Product (full detail) ───
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Cache individual product
+    const cacheKey = `product:${id}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return sendSuccess(res, 200, cached);
 
     const product = await prisma.product.findUnique({
       where: { id },
@@ -84,19 +106,24 @@ const getProductById = async (req, res) => {
     });
 
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found." });
+      return sendError(res, 404, "Product not found.");
     }
 
-    return res.status(200).json({ success: true, product });
+    await cache.set(cacheKey, { product }, 30);
+    return sendSuccess(res, 200, { product });
   } catch (error) {
-    console.error("[GetProductById Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error." });
+    logger.error({ err: error }, "[GetProductById Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 };
 
-// ─── GET /products/categories — List All Categories ───
+// ─── GET /products/categories — List All Categories (cached 60s) ───
 const getCategories = async (req, res) => {
   try {
+    const cacheKey = "categories:all";
+    const cached = await cache.get(cacheKey);
+    if (cached) return sendSuccess(res, 200, cached);
+
     const categories = await prisma.product.findMany({
       where: { isAvailable: true },
       select: { category: true },
@@ -104,13 +131,12 @@ const getCategories = async (req, res) => {
       orderBy: { category: "asc" },
     });
 
-    return res.status(200).json({
-      success: true,
-      categories: categories.map((c) => c.category),
-    });
+    const result = { categories: categories.map((c) => c.category) };
+    await cache.set(cacheKey, result, 60);
+    return sendSuccess(res, 200, result);
   } catch (error) {
-    console.error("[GetCategories Error]", error);
-    return res.status(500).json({ success: false, message: "Internal server error." });
+    logger.error({ err: error }, "[GetCategories Error]");
+    return sendError(res, 500, "Internal server error.");
   }
 };
 
