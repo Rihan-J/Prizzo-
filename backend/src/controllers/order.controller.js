@@ -88,6 +88,9 @@ const checkout = async (req, res) => {
       await tx.cart.update({ where: { id: cart.id }, data: { storeId: null } });
 
       return newOrder;
+    }, {
+      timeout: 20000,    // 20 second timeout
+      maxWait: 10000,    // 10 second max wait to acquire transaction 
     });
 
     // ── Cache invalidation: stock changed → invalidate products + stores ──
