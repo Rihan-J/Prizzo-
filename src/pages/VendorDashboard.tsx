@@ -317,8 +317,9 @@ function VendorProducts({ products, onRefresh }: { products: any[]; onRefresh: (
     try {
       await api.patch(`/vendor/products/${p.id}`, { isAvailable: !p.isAvailable });
       await onRefresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to toggle stock", error);
+      alert(error.response?.data?.error || error.response?.data?.message || "Failed to toggle stock");
     }
   };
 

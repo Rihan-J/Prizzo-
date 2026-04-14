@@ -206,7 +206,7 @@ const getVendorProducts = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, basePrice, profitMargin, category, stock } = req.body;
+    const { name, description, basePrice, profitMargin, category, stock, isAvailable } = req.body;
 
     const vendor = await prisma.vendor.findUnique({ where: { userId: req.user.userId } });
     if (!vendor) return sendError(res, 403, "No vendor profile found.");
@@ -247,11 +247,23 @@ const updateProduct = async (req, res) => {
       if (typeof category !== "string" || category.trim().length < 2) return sendError(res, 400, "Category must be at least 2 characters.");
       updateData.category = category.trim().toLowerCase();
     }
+    if (isAvailable !== undefined) {
+      if (typeof isAvailable !== "boolean") return sendError(res, 400, "isAvailable must be a boolean.");
+      if (isAvailable && existingProduct.stock === 0 && stock === undefined) {
+        return sendError(res, 400, "Cannot make product active when stock is 0.");
+      }
+      updateData.isAvailable = isAvailable;
+    }
+
     if (stock !== undefined) {
       const parsedStock = parseInt(stock, 10);
       if (isNaN(parsedStock) || parsedStock < 0) return sendError(res, 400, "Stock must be a non-negative integer.");
       updateData.stock = parsedStock;
-      updateData.isAvailable = parsedStock > 0;
+      if (isAvailable === undefined) {
+        updateData.isAvailable = parsedStock > 0;
+      } else if (isAvailable && parsedStock === 0) {
+        updateData.isAvailable = false;
+      }
     }
 
     if (Object.keys(updateData).length === 0) return sendError(res, 400, "No valid fields provided for update.");
