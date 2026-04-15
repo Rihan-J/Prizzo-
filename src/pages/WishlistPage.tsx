@@ -24,8 +24,9 @@ export default function WishlistPage() {
         // For demo purposes, we fetch latest products and filter
         // A real app would send ids[] to the backend
         const res = await api.get('/products?limit=100');
-        if (res.data?.success) {
-          setWished(res.data.products.filter((p: any) => ids.includes(p.id)));
+        const responseData = res.data?.data || res.data;
+        if (responseData?.products) {
+          setWished(responseData.products.filter((p: any) => ids.includes(p.id)));
         }
       } catch (error) {
         console.error("Failed to load wishlist", error);

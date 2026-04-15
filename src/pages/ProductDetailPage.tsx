@@ -76,11 +76,7 @@ export default function ProductDetailPage() {
   const inStock = product.isAvailable ?? (product.stock > 0);
   const storeName = product.store?.name || 'Local Store';
 
-  const reviews = [
-    { name: 'Rahul S.', rating: 5, text: 'Excellent quality! Picked up within 10 minutes.', time: '2 days ago' },
-    { name: 'Priya M.', rating: 4, text: 'Good product. Store was easy to find.', time: '5 days ago' },
-    { name: 'Karthik R.', rating: 5, text: 'Best price in town. Love the compare feature!', time: '1 week ago' },
-  ];
+  // TODO: Implement real reviews via GET /products/:id/reviews when backend is ready
 
   const handleAdd = async () => {
     try {
@@ -170,17 +166,10 @@ export default function ProductDetailPage() {
         {/* Reviews */}
         <div>
           <h3 className="text-sm font-semibold mb-3">Reviews</h3>
-          <div className="space-y-3">
-            {reviews.map((r, i) => (
-              <div key={i} className="bg-gray-50 rounded-xl p-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{r.name}</span>
-                  <div className="flex gap-0.5">{Array.from({ length: r.rating }).map((_, j) => <Star key={j} size={10} className="text-yellow-500 fill-yellow-500" />)}</div>
-                  <span className="text-xs text-gray-400 ml-auto">{r.time}</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">{r.text}</p>
-              </div>
-            ))}
+          <div className="bg-gray-50 rounded-2xl p-6 text-center">
+            <span className="text-3xl">💬</span>
+            <p className="text-gray-400 text-sm mt-2">No reviews yet</p>
+            <p className="text-xs text-gray-300 mt-1">Be the first to review this product!</p>
           </div>
         </div>
 

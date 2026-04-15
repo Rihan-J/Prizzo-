@@ -24,8 +24,9 @@ export default function OrderTrackingPage() {
       try {
         setLoading(true);
         const res = await api.get('/orders/user'); 
-        if (res.data?.success) {
-          const found = res.data.orders.find((o: { id: string }) => o.id === id);
+        const responseData = res.data?.data || res.data;
+        if (responseData?.orders) {
+          const found = responseData.orders.find((o: { id: string }) => o.id === id);
           if (found) setOrder(found);
         }
       } catch (error) {

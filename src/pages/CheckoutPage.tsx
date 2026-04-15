@@ -49,7 +49,8 @@ export default function CheckoutPage() {
         });
       }
     } catch (error: any) {
-      alert(error.response?.data?.error || error.response?.data?.message || "Checkout failed. Please try again.");
+      alert(error.response?.data?.error || "Checkout failed. Please try again.");
+      await fetchCart(); // Sync frontend with backend to fix stale cart state
     } finally {
       setLoading(false);
     }

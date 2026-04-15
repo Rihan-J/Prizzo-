@@ -308,10 +308,7 @@ export default function StoreDetailPage() {
     </div>
   );
 
-  const reviews = [
-    { name: 'Ananya K.', rating: 5, text: 'Great selection and always in stock!', time: '3 days ago' },
-    { name: 'Suresh N.', rating: 4, text: 'Quick pickup. Friendly staff.', time: '1 week ago' },
-  ];
+  // TODO: Implement real reviews via GET /stores/:id/reviews when backend is ready
 
   // Derived properties with fallbacks
   const emoji = store.emoji || '🏪';
@@ -433,21 +430,10 @@ export default function StoreDetailPage() {
           {/* Reviews */}
           <div>
             <h3 className="text-sm font-semibold mb-3">Reviews</h3>
-            <div className="space-y-3">
-              {reviews.map((r, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{r.name}</span>
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: r.rating }).map((_, j) => (
-                        <Star key={j} size={10} className="text-yellow-500 fill-yellow-500" />
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-400 ml-auto">{r.time}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{r.text}</p>
-                </div>
-              ))}
+            <div className="bg-gray-50 rounded-2xl p-6 text-center">
+              <span className="text-3xl">💬</span>
+              <p className="text-gray-400 text-sm mt-2">No reviews yet</p>
+              <p className="text-xs text-gray-300 mt-1">Be the first to review this store!</p>
             </div>
           </div>
         </div>

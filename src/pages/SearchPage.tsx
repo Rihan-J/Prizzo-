@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowLeft, X, SlidersHorizontal, TrendingUp } from 'lucide-react';
-import { categories } from '../data/categories';
+import { getCategoryList, getCategoryDisplay } from '../config/categoryConfig';
 import { ProductCard, StoreCard } from '../components/Cards';
 import api, { createCancelableRequest } from '../services/api';
 import { useDebounce } from '../hooks/useDebounce';
@@ -29,6 +29,9 @@ export default function SearchPage() {
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const cancelRef = useRef<ReturnType<typeof createCancelableRequest> | null>(null);
+
+  // Category display config
+  const categories = getCategoryList();
 
   // ── Debounced search query (400ms) ──
   const debouncedQuery = useDebounce(query, 400);
@@ -98,8 +101,8 @@ export default function SearchPage() {
   useEffect(() => {
     if (params.get('q')) setQuery(params.get('q')!);
     if (params.get('category')) {
-      const cat = categories.find(c => c.id === params.get('category'));
-      if (cat) setQuery(cat.name);
+      const catDisplay = getCategoryDisplay(params.get('category')!);
+      if (catDisplay) setQuery(catDisplay.name);
     }
   }, [params]);
 

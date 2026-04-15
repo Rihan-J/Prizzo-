@@ -4,13 +4,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, MapPin, Mic, Bell, ChevronRight, Sparkles, Globe, Check, X, Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { banners, aiSuggestions } from '../data/banners';
+import { getCategoryList } from '../config/categoryConfig';
 import { ProductCard, StoreCard } from '../components/Cards';
 import api from '../services/api';
 
-// Fallback categories since they just contain static UI config/colors 
-// and don't require database representation for a hackathon UI.
-import { categories } from '../data/categories';
+// ── Inline UI constants — promotional banners (frontend layout config) ──
+const BANNERS = [
+  { id: 'b1', title: 'Compare prices. Save more.', subtitle: 'Find the best deal on everyday items nearby', cta: 'Compare Now', emoji: '💰', bgGradient: 'from-orange-400 to-orange-600', link: '/compare' },
+  { id: 'b2', title: 'Fresh Groceries in 10 min', subtitle: 'Pickup from stores near you', cta: 'Shop Now', emoji: '🛒', bgGradient: 'from-green-400 to-emerald-600', link: '/search?category=grocery' },
+  { id: 'b3', title: 'Delicious Food Nearby 🍛', subtitle: 'Order and pick up hot meals', cta: 'Order Now', emoji: '🍛', bgGradient: 'from-red-400 to-rose-600', link: '/search?category=food' },
+  { id: 'b4', title: 'Medicine at your doorstep', subtitle: 'Pickup in minutes from pharmacies', cta: 'Browse', emoji: '💊', bgGradient: 'from-blue-400 to-blue-600', link: '/search?category=medicine' },
+];
+
+// ── Inline UI constants — AI search suggestion chips ──
+const AI_SUGGESTIONS = [
+  { text: 'Need milk nearby?', query: 'milk', emoji: '🥛' },
+  { text: 'Compare charger prices', query: 'charger', emoji: '🔌' },
+  { text: 'Find paracetamol open now', query: 'paracetamol', emoji: '💊' },
+  { text: 'Best biryani pickup', query: 'biryani', emoji: '🍛' },
+  { text: 'Fresh fruits nearby', query: 'fruits', emoji: '🥭' },
+  { text: 'Bakery items in 10 min', query: 'cake', emoji: '🍰' },
+];
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -26,6 +40,9 @@ export default function HomePage() {
 
   // Live Database State
   const [products, setProducts] = useState<any[]>([]);
+
+  // Category display config
+  const categories = getCategoryList();
 
   // Fetch online products (served from 30s cache on repeat visits)
   useEffect(() => {
@@ -81,12 +98,12 @@ export default function HomePage() {
     setShowLanguageModal(false);
   };
 
-  useEffect(() => { const t = setInterval(() => setBannerIdx(i => (i + 1) % banners.length), 4000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setBannerIdx(i => (i + 1) % BANNERS.length), 4000); return () => clearInterval(t); }, []);
 
   if (isVendor) { navigate('/vendor', { replace: true }); return null; }
 
   // Derive views from real database products
-  const trending = products.slice(0, 8); // Just take first 8 for trending demo
+  const trending = products.slice(0, 8);
   const foodItems = products.filter(p => p.category.toLowerCase() === 'food').slice(0, 6);
   const pharma = products.filter(p => p.category.toLowerCase() === 'medicine').slice(0, 4);
   const elec = products.filter(p => p.category.toLowerCase() === 'electronics').slice(0, 4);
@@ -130,7 +147,6 @@ export default function HomePage() {
             </button>
             <button onClick={() => navigate('/notifications')} className="relative bg-white/15 p-2 rounded-xl backdrop-blur-sm">
               <Bell size={18} className="text-white" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-orange-500" />
             </button>
           </div>
         </div>
@@ -174,16 +190,16 @@ export default function HomePage() {
 
         {/* Hero Banner */}
         <motion.div key={bannerIdx} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-          onClick={() => navigate(banners[bannerIdx].link)}
-          className={`bg-gradient-to-r ${banners[bannerIdx].bgGradient} rounded-2xl p-5 relative overflow-hidden cursor-pointer min-h-[120px]`}>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-6xl opacity-20">{banners[bannerIdx].emoji}</div>
-          <h3 className="text-white font-bold text-lg relative z-10">{banners[bannerIdx].title}</h3>
-          <p className="text-white/80 text-xs mt-1 relative z-10">{banners[bannerIdx].subtitle}</p>
+          onClick={() => navigate(BANNERS[bannerIdx].link)}
+          className={`bg-gradient-to-r ${BANNERS[bannerIdx].bgGradient} rounded-2xl p-5 relative overflow-hidden cursor-pointer min-h-[120px]`}>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-6xl opacity-20">{BANNERS[bannerIdx].emoji}</div>
+          <h3 className="text-white font-bold text-lg relative z-10">{BANNERS[bannerIdx].title}</h3>
+          <p className="text-white/80 text-xs mt-1 relative z-10">{BANNERS[bannerIdx].subtitle}</p>
           <button className="mt-3 bg-white/25 text-white text-xs font-medium px-4 py-2 rounded-xl relative z-10 backdrop-blur-sm">
-            {banners[bannerIdx].cta} →
+            {BANNERS[bannerIdx].cta} →
           </button>
           <div className="flex gap-1 mt-3">
-            {banners.map((_, i) => <div key={i} className={`h-1 rounded-full ${i === bannerIdx ? 'w-6 bg-white' : 'w-2 bg-white/40'} transition-all`} />)}
+            {BANNERS.map((_, i) => <div key={i} className={`h-1 rounded-full ${i === bannerIdx ? 'w-6 bg-white' : 'w-2 bg-white/40'} transition-all`} />)}
           </div>
         </motion.div>
 
@@ -194,7 +210,7 @@ export default function HomePage() {
             <span className="text-sm font-semibold text-gray-800">{t('What are you looking for today?')}</span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {aiSuggestions.map(s => (
+            {AI_SUGGESTIONS.map(s => (
               <motion.button whileTap={{ scale: 0.95 }} key={s.query}
                 onClick={() => navigate(`/search?q=${s.query}`)}
                 className="bg-white text-xs px-3 py-2 rounded-xl text-gray-700 font-medium shadow-sm hover:shadow-md transition-shadow flex items-center gap-1.5">
@@ -253,6 +269,15 @@ export default function HomePage() {
               {grocery.map(p => <ProductCard key={p.id} product={p} compact />)}
             </div>
           </Section>
+        )}
+
+        {/* Empty state when no products at all */}
+        {products.length === 0 && !loading && (
+          <div className="text-center py-16">
+            <span className="text-5xl">🏪</span>
+            <p className="text-gray-500 mt-4 font-medium">No products available yet</p>
+            <p className="text-xs text-gray-400 mt-1">Check back soon — stores are adding items daily!</p>
+          </div>
         )}
 
         <div className="h-4" />
