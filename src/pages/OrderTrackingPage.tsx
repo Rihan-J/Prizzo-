@@ -19,18 +19,22 @@ export default function OrderTrackingPage() {
   const [userRating, setUserRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchOrder = async () => {
       try {
         setLoading(true);
+        setFetchError(null);
         const res = await api.get('/orders/user'); 
         const responseData = res.data?.data || res.data;
         if (responseData?.orders) {
           const found = responseData.orders.find((o: { id: string }) => o.id === id);
           if (found) setOrder(found);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to fetch order", error);
+        setFetchError(error.message === 'Network Error' ? 'Cannot connect to backend server. Please check your connection.' : 'Failed to load order details.');
       } finally {
         setLoading(false);
       }
@@ -44,7 +48,7 @@ export default function OrderTrackingPage() {
       await api.post(`/orders/${id}/review`, { rating });
       setReviewSubmitted(true);
     } catch (error) {
-      console.error("Failed to submit rating", error);
+      console.error(error);
     } finally {
       setIsSubmitting(false);
     }
@@ -71,6 +75,18 @@ export default function OrderTrackingPage() {
       </div>
     );
   }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <AlertCircle size={48} className="text-red-400" />
+        <p className="text-gray-700 font-medium">{fetchError}</p>
+        <p className="text-xs text-gray-400 max-w-xs block">If you are using a mobile phone, verify that your deployed app isn't trying to connect to localhost.</p>
+        <button onClick={() => window.location.reload()} className="bg-orange-50 text-orange-600 px-6 py-2 rounded-xl font-medium mt-2">Retry</button>
+      </div>
+    );
+  }
+
   if (!order) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4">
