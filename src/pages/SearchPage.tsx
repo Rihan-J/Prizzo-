@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowLeft, X, SlidersHorizontal, TrendingUp } from 'lucide-react';
+import { Search, ArrowLeft, X, SlidersHorizontal, TrendingUp, Mic } from 'lucide-react';
 import { getCategoryList, getCategoryDisplay } from '../config/categoryConfig';
 import { ProductCard, StoreCard } from '../components/Cards';
 import api, { createCancelableRequest } from '../services/api';
@@ -98,12 +98,29 @@ export default function SearchPage() {
     }
   };
 
-  useEffect(() => {
-    if (params.get('q')) setQuery(params.get('q')!);
-    if (params.get('category')) {
-      const catDisplay = getCategoryDisplay(params.get('category')!);
-      if (catDisplay) setQuery(catDisplay.name);
+  const startVoiceSearch = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in this browser.");
+      return;
     }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.start();
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+      doSearch(transcript);
+    };
+  };
+
+  useEffect(() => {
+    const qParam = params.get('q');
+    if (qParam) setQuery(qParam);
+    // If we have a category but no explicit search query, keep search bar empty or show category hint
+    // but DON'T set query to category name because it breaks backend filtering
   }, [params]);
 
   const doSearch = (q: string) => {
@@ -147,9 +164,13 @@ export default function SearchPage() {
             <Search size={16} className="text-gray-400" />
             <input type="text" value={query} onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && doSearch(query)}
-              placeholder="Search products, stores, dishes…"
+              placeholder={params.get('category') ? `Search in ${getCategoryDisplay(params.get('category')!)?.name}...` : "Search products, stores, dishes..."}
               className="flex-1 bg-transparent text-sm outline-none" autoFocus />
-            {query && <button onClick={() => setQuery('')}><X size={14} className="text-gray-400" /></button>}
+            {query ? (
+              <button onClick={() => setQuery('')}><X size={14} className="text-gray-400" /></button>
+            ) : (
+              <button onClick={startVoiceSearch}><Mic size={16} className="text-orange-500" /></button>
+            )}
           </div>
           <button onClick={() => setShowFilters(!showFilters)} className="p-2 bg-orange-50 rounded-xl">
             <SlidersHorizontal size={18} className="text-orange-500" />
