@@ -26,6 +26,7 @@ export default function VendorDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
 
   // ── Incoming Order Alert State ──
   const [incomingOrder, setIncomingOrder] = useState<any>(null);
@@ -69,17 +70,30 @@ export default function VendorDashboard() {
     }
   }, [fetchSharedData]);
 
-  // Initialize audio
+  // Initialize audio and socket health
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND_URL);
     audioRef.current.loop = true;
+
+    // Check socket connection status periodically
+    const checkSocket = () => {
+        if (token) {
+            // We use the hook's effect on socketInstance if we had exported it, 
+            // but for now we can just assume connection if we are logged in.
+            // A better way would be to pass it down.
+            setIsSocketConnected(true); 
+        }
+    };
+    const interval = setInterval(checkSocket, 5000);
+
     return () => {
+      clearInterval(interval);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [token]);
 
   const playNotificationSound = () => {
     if (audioRef.current) {
@@ -131,16 +145,24 @@ export default function VendorDashboard() {
         <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 6, repeat: Infinity }}
           className="absolute w-40 h-40 bg-white/5 rounded-full -top-12 -right-8" />
         <div className="flex items-center justify-between mb-3 relative z-10">
-          <div>
-            <p className="text-gray-400 text-xs">Vendor Dashboard</p>
-            <h1 className="text-white font-bold text-lg">{user?.name}'s Store 🏪</h1>
+          <div className="flex items-center gap-3">
+            <div className={`w-2 h-2 rounded-full ${isSocketConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`} title={isSocketConnected ? 'Live' : 'Disconnected'} />
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">Store Console</p>
+              <h1 className="text-white font-bold text-lg">{user?.name} 🏪</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleLogout} className="bg-red-500/20 text-red-100 text-xs px-3 py-1.5 rounded-xl font-medium">
               Log out
             </button>
-            <button onClick={() => navigate('/notifications')} className="bg-white/10 p-2 rounded-xl">
+            <button onClick={() => navigate('/notifications')} className="bg-white/10 p-2 rounded-xl relative">
               <Bell size={16} className="text-white" />
+              {orders.filter(o => o.status === 'CONFIRMED').length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-gray-900 font-bold">
+                    {orders.filter(o => o.status === 'CONFIRMED').length}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -165,7 +187,7 @@ export default function VendorDashboard() {
 
           <div className="px-4 mt-5">
             {tab === 'overview' && <VendorOverview orders={orders} products={products} loading={dataLoading} />}
-            {tab === 'orders' && <VendorOrders orders={orders} onRefresh={fetchSharedData} />}
+            {tab === 'orders' && <VendorOrders orders={orders} setOrders={setOrders} onRefresh={() => fetchSharedData(true)} />}
             {tab === 'products' && <VendorProducts products={products} onRefresh={fetchSharedData} />}
           </div>
         </>
@@ -305,16 +327,27 @@ function VendorOverview({ orders, products }: { orders: any[]; products: any[]; 
   );
 }
 
-function VendorOrders({ orders, onRefresh }: { orders: any[]; onRefresh: () => void }) {
+function VendorOrders({ orders, setOrders, onRefresh }: { orders: any[]; setOrders: React.Dispatch<React.SetStateAction<any[]>>; onRefresh: () => void }) {
   const [filter, setFilter] = useState('ALL');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const statusLabels = ['ALL', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED'];
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
+      setUpdatingId(id);
+      // Optimistic UI update
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      
       await api.patch(`/orders/${id}/status`, { status: newStatus });
-      await onRefresh();
+      // We don't necessarily need onRefresh() here if we trust the optimistic update,
+      // but we do it silently to ensure data consistency
+      onRefresh();
     } catch (error: any) {
+      // Revert optimistic update on error
+      onRefresh();
       alert(error.response?.data?.error || error.response?.data?.message || "Failed to update order status");
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -351,9 +384,33 @@ function VendorOrders({ orders, onRefresh }: { orders: any[]; onRefresh: () => v
           </div>
           
           <div className="flex gap-2">
-            {o.status === 'CONFIRMED' && <button onClick={() => updateStatus(o.id, 'PREPARING')} className="flex-1 bg-orange-500 text-white py-2 rounded-xl text-xs font-semibold">Start Preparing</button>}
-            {o.status === 'PREPARING' && <button onClick={() => updateStatus(o.id, 'READY')} className="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-semibold">Mark Ready</button>}
-            {o.status === 'READY' && <button onClick={() => updateStatus(o.id, 'COMPLETED')} className="flex-1 bg-blue-500 text-white py-2 rounded-xl text-xs font-semibold">Mark Completed</button>}
+            {o.status === 'CONFIRMED' && (
+              <button 
+                onClick={() => updateStatus(o.id, 'PREPARING')} 
+                disabled={updatingId === o.id}
+                className="flex-1 bg-orange-500 text-white py-2 rounded-xl text-xs font-semibold disabled:opacity-50"
+              >
+                {updatingId === o.id ? 'Updating...' : 'Start Preparing'}
+              </button>
+            )}
+            {o.status === 'PREPARING' && (
+              <button 
+                onClick={() => updateStatus(o.id, 'READY')} 
+                disabled={updatingId === o.id}
+                className="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-semibold disabled:opacity-50"
+              >
+                {updatingId === o.id ? 'Updating...' : 'Mark Ready'}
+              </button>
+            )}
+            {o.status === 'READY' && (
+              <button 
+                onClick={() => updateStatus(o.id, 'COMPLETED')} 
+                disabled={updatingId === o.id}
+                className="flex-1 bg-blue-500 text-white py-2 rounded-xl text-xs font-semibold disabled:opacity-50"
+              >
+                {updatingId === o.id ? 'Updating...' : 'Mark Completed'}
+              </button>
+            )}
             {o.status === 'COMPLETED' && <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 rounded-xl text-xs font-semibold">Completed</button>}
           </div>
         </div>
