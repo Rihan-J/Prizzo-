@@ -39,7 +39,8 @@ const allowedOrigins = config.nodeEnv === "production"
     "https://prizzo-in.vercel.app",
     "https://prizzo.vercel.app",
     "https://prizzo-p7ju-hgzq69a7t-rihanj27pvt-4651s-projects.vercel.app",
-    "https://prizzo-chi.vercel.app"
+    "https://prizzo-chi.vercel.app",
+    "https://prizzo-india.vercel.app"
   ].filter(Boolean)
   : ["http://localhost:5173"];
 
