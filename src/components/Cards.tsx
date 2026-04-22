@@ -24,42 +24,48 @@ export function ProductCard({ product }: { product: any }) {
     <motion.div 
       whileTap={{ scale: 0.98 }} 
       onClick={() => navigate(`/product/${product.id}`)}
-      className="bg-white rounded-xl p-3 shadow-md cursor-pointer relative border border-[#f0ede9] flex flex-col h-full hover:shadow-lg transition-shadow"
+      className="bg-white rounded-[24px] p-4 shadow-lg cursor-pointer relative border border-[#f0ede9] flex flex-col h-full hover:shadow-xl transition-all duration-300 group"
     >
+      {/* Wishlist Button */}
       <button 
         onClick={(e) => { e.stopPropagation(); toggle(product.id); }} 
-        className="absolute top-2 right-2 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm"
+        className="absolute top-3 right-3 z-10 w-9 h-9 flex items-center justify-center bg-white/90 backdrop-blur-md rounded-full shadow-sm border border-[#f0ede9]"
       >
-        <Heart size={14} className={isWished(product.id) ? 'fill-[#e63946] text-[#e63946]' : 'text-[#8e8e8e]'} />
+        <Heart size={16} className={isWished(product.id) ? 'fill-[#e63946] text-[#e63946]' : 'text-[#8e8e8e]'} />
       </button>
 
-      <div className="w-full aspect-square bg-[#F8F6F3] rounded-lg flex items-center justify-center text-6xl mb-4 group-hover:scale-105 transition-transform duration-300">
+      {/* Product Image Area */}
+      <div className="w-full aspect-[4/3] bg-[#F8F6F3] rounded-[20px] flex items-center justify-center text-7xl mb-5 group-hover:scale-105 transition-transform duration-500 shadow-inner">
         {emoji}
       </div>
 
-      <div className="flex-1 flex flex-col justify-between">
-        <div className="space-y-1">
-          <h3 className="text-sm font-bold text-[#1E1E1E] leading-tight line-clamp-2">
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col justify-between space-y-4">
+        <div>
+          <h3 className="text-[15px] font-[900] text-[#1E1E1E] leading-[1.3] line-clamp-2 tracking-tight">
             {product.name}
           </h3>
-          <div className="flex items-center gap-1">
-            <Star size={10} className="text-[#FF6A00] fill-[#FF6A00]" />
-            <span className="text-[10px] font-bold text-[#1E1E1E]">{rating}</span>
-            <span className="text-[10px] text-[#8e8e8e] ml-1">{pickupEta} min</span>
+          <div className="flex items-center gap-1.5 mt-2">
+            <div className="flex items-center gap-0.5 bg-[#FF6A00]/10 px-2 py-0.5 rounded-lg">
+              <Star size={12} className="text-[#FF6A00] fill-[#FF6A00]" />
+              <span className="text-[11px] font-black text-[#FF6A00]">{rating}</span>
+            </div>
+            <span className="text-[11px] text-[#8e8e8e] font-bold">• {pickupEta} MINS</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex flex-col">
-            <span className="text-xs text-[#8e8e8e] font-medium">₹{price + 10}</span>
-            <span className="text-lg font-black text-[#1E1E1E]">₹{price}</span>
+        {/* Pricing & CTA */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex flex-col -space-y-1">
+             <span className="text-[11px] text-[#8e8e8e] font-bold line-through opacity-60">₹{price + 15}</span>
+             <span className="text-[20px] font-[900] text-[#1E1E1E] tracking-tighter">₹{price}</span>
           </div>
           <button 
             onClick={handleAdd} 
             disabled={!inStock}
-            className="bg-[#fff1e6] text-[#FF6A00] text-xs font-black px-4 py-2 rounded-full hover:bg-[#ffe2cc] transition-colors active:scale-95 disabled:opacity-50"
+            className="bg-[#fff1e6] text-[#FF6A00] text-[13px] font-[900] px-5 py-2.5 rounded-full hover:bg-[#ffe2cc] transition-all active:scale-90 disabled:opacity-40 shadow-sm border border-[#FF6A00]/10"
           >
-            + Add
+            + ADD
           </button>
         </div>
       </div>
@@ -95,30 +101,33 @@ export function StoreCard({ store }: { store: any }) {
     <motion.div 
       whileTap={{ scale: 0.98 }} 
       onClick={() => navigate(`/store/${store.id}`)}
-      className="bg-white rounded-2xl p-4 shadow-sm cursor-pointer border border-[#f0ede9] flex gap-4 items-center hover:shadow-md transition-shadow"
+      className="bg-white rounded-[24px] p-5 shadow-lg cursor-pointer border border-[#f0ede9] flex gap-5 items-center hover:shadow-xl transition-all"
     >
-      <div className="w-20 h-20 bg-[#F8F6F3] rounded-2xl flex items-center justify-center text-4xl flex-shrink-0 border border-[#f0ede9]">
+      <div className="w-24 h-24 bg-[#F8F6F3] rounded-[22px] flex items-center justify-center text-5xl flex-shrink-0 border border-[#f0ede9] shadow-inner">
         {emoji}
       </div>
-      <div className="flex-1 min-w-0 py-1">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-base text-[#1E1E1E] truncate">{store.name}</h3>
-          <span className="text-xs font-black text-[#FF6A00] bg-[#fff1e6] px-3 py-1 rounded-full">
-            {distance} km
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1.5">
+          <h3 className="font-[900] text-[17px] text-[#1E1E1E] truncate tracking-tight">{store.name}</h3>
+          <span className="text-[11px] font-black text-[#FF6A00] bg-[#fff1e6] px-3 py-1 rounded-full border border-[#FF6A00]/10">
+            {distance} KM
           </span>
         </div>
-        <div className="flex items-center gap-4 mt-2 text-xs font-bold">
-          <span className="flex items-center gap-1">
-            <Star size={12} className="text-[#FF6A00] fill-[#FF6A00]" /> {rating}
+        <div className="flex items-center gap-4 text-[12px] font-black">
+          <span className="flex items-center gap-1 text-[#1E1E1E]">
+            <Star size={13} className="text-[#FF6A00] fill-[#FF6A00]" /> {rating}
           </span>
-          <span className="text-[#8e8e8e]">•</span>
+          <span className="text-[#8e8e8e] opacity-40">•</span>
           <span className={isOpen ? 'text-[#1ab34e]' : 'text-[#e63946]'}>
-            {isOpen ? 'Open Now' : 'Closed'}
+            {isOpen ? 'OPEN NOW' : 'CLOSED'}
           </span>
         </div>
-        <div className="mt-2 text-[10px] text-[#8e8e8e] font-medium flex items-center gap-1">
-          <MapPin size={10} /> {store.address || 'Shivamogga, Karnataka'}
+        <div className="mt-3 text-[11px] text-[#8e8e8e] font-bold flex items-center gap-1.5 opacity-80 uppercase tracking-wider">
+          <MapPin size={12} className="text-[#FF6A00]" /> {store.address?.split(',')[0] || 'SHIVAMOGGA'}
         </div>
+      </div>
+      <div className="w-10 h-10 bg-[#F8F6F3] rounded-full flex items-center justify-center text-[#8e8e8e] border border-[#f0ede9]">
+         <ChevronRight size={20} />
       </div>
     </motion.div>
   );

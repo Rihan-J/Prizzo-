@@ -151,62 +151,62 @@ export default function HomePage() {
 
   return (
     <div className="min-h-dvh bg-[#F8F6F3] pb-nav">
-      {/* 🔶 Refined Header */}
-      <header className="px-5 pt-8 pb-4 bg-[#F8F6F3]">
+      {/* 🔶 Structured Header */}
+      <header className="px-6 pt-10 pb-6 bg-[#F8F6F3]">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-black text-[#1E1E1E] tracking-tight">Hi {user?.name?.split(' ')[0] || 'Farhan'} 👋</h1>
-            <button onClick={() => navigate('/search')} className="flex items-center gap-0.5 text-[11px] text-[#8e8e8e] mt-1 font-medium">
-              <MapPin size={11} className="text-[#FF6A00]" />
-              {locationLoading ? 'Detecting…' : userLocation}
-              <ChevronRight size={11} />
+          <div className="space-y-1">
+            <h1 className="text-3xl font-[900] text-[#1E1E1E] tracking-tight leading-none">
+              Hi Farhan 👋
+            </h1>
+            <button onClick={() => navigate('/search')} className="flex items-center gap-1 text-[12px] text-[#8e8e8e] font-semibold">
+              <MapPin size={12} className="text-[#FF6A00]" />
+              <span className="truncate max-w-[200px]">{userLocation || 'Detecting location...'}</span>
+              <ChevronRight size={12} />
             </button>
           </div>
-          <div className="flex items-center gap-2.5">
-            <button onClick={() => setShowLanguageModal(true)} className="p-2.5 bg-white rounded-full shadow-sm text-[#1E1E1E] border border-[#f0ede9]">
-              <Globe size={18} />
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowLanguageModal(true)} className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-[#f0ede9] text-[#1E1E1E] transition-transform active:scale-95">
+              <Globe size={20} />
             </button>
-            <button onClick={() => navigate('/notifications')} className="p-2.5 bg-white rounded-full shadow-sm text-[#1E1E1E] border border-[#f0ede9]">
-              <Bell size={18} />
+            <button onClick={() => navigate('/notifications')} className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-[#f0ede9] text-[#1E1E1E] transition-transform active:scale-95">
+              <Bell size={20} />
             </button>
           </div>
         </div>
       </header>
 
-      <div className="h-2" />
-
-      {/* 🔍 Elevated Search Bar */}
-      <div className="px-5 py-3 sticky top-0 z-30 bg-[#F8F6F3]/95 backdrop-blur-md">
+      {/* 🔍 Dominant Search Bar */}
+      <div className="px-6 pb-4 sticky top-0 z-30 bg-[#F8F6F3]/95 backdrop-blur-md">
         <motion.div 
           whileTap={{ scale: 0.98 }} 
           onClick={() => navigate('/search')}
-          className="bg-white rounded-2xl px-5 py-4 flex items-center gap-3 shadow-md cursor-pointer border border-[#f0ede9] focus-within:border-[#FF6A00]/40 transition-all"
+          className="bg-white rounded-[20px] px-5 py-4.5 flex items-center gap-4 shadow-lg cursor-pointer border border-[#f0ede9] transition-all"
         >
-          <Search size={20} className="text-[#FF6A00]" />
-          <span className="text-[#8e8e8e] text-sm font-medium flex-1 truncate">
-            Search groceries, medicines, or nearby stores
+          <Search size={22} className="text-[#FF6A00]" />
+          <span className="text-[#8e8e8e] text-base font-semibold flex-1 truncate">
+            Search groceries, medicine, or stores
           </span>
-          <div className="w-px h-5 bg-gray-200" />
+          <div className="w-px h-6 bg-gray-100" />
           <button 
             onClick={(e) => { e.stopPropagation(); startVoiceSearch(); }}
-            className="p-1 hover:bg-gray-50 rounded-full transition-colors"
+            className="p-1 hover:bg-orange-50 rounded-full transition-colors"
           >
-            <Mic size={20} className="text-[#8e8e8e]" />
+            <Mic size={22} className="text-[#8e8e8e]" />
           </button>
         </motion.div>
       </div>
 
-      <div className="px-5 mt-6 space-y-10">
-        {/* ✨ Secondary Suggestion Chips */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+      <div className="px-6 mt-4 space-y-12 pb-10">
+        {/* ✨ Ultra-light Suggestion Chips */}
+        <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1">
           {AI_SUGGESTIONS.map(s => (
             <motion.button 
               key={s.query}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate(`/search?q=${s.query}`)}
-              className="bg-white px-3.5 py-1.5 rounded-xl shadow-sm border border-[#f0ede9] text-[#1E1E1E] text-[11px] font-semibold whitespace-nowrap flex items-center gap-1.5 hover:bg-[#fff1e6] hover:border-[#FF6A00]/20 transition-all"
+              className="bg-white px-4 py-2 rounded-xl shadow-sm border border-[#f0ede9] text-[#1E1E1E] text-[12px] font-bold whitespace-nowrap flex items-center gap-2 hover:bg-[#fff1e6] hover:border-[#FF6A00]/20 transition-all"
             >
-              <span className="grayscale opacity-50 text-xs">{s.emoji}</span>
+              <span className="grayscale opacity-40 text-sm">{s.emoji}</span>
               {s.text.replace('?', '')}
             </motion.button>
           ))}
@@ -295,16 +295,18 @@ export default function HomePage() {
 
 function Section({ title, children, onSeeAll }: { title: string; children: React.ReactNode; onSeeAll?: () => void }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-extrabold text-lg text-[#1E1E1E] tracking-tight">{title}</h2>
+        <h2 className="font-[900] text-xl text-[#1E1E1E] tracking-tight">{title}</h2>
         {onSeeAll && (
-          <button onClick={onSeeAll} className="text-xs font-bold text-[#FF6A00] flex items-center bg-[#fff1e6] px-2.5 py-1 rounded-lg">
-            See all <ChevronRight size={14} />
+          <button onClick={onSeeAll} className="text-xs font-black text-[#FF6A00] flex items-center bg-[#fff1e6] px-3 py-1.5 rounded-xl transition-transform active:scale-95">
+            See all <ChevronRight size={14} className="ml-0.5" />
           </button>
         )}
       </div>
-      {children}
+      <div className="relative">
+        {children}
+      </div>
     </div>
   );
 }
