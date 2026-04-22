@@ -78,6 +78,7 @@ export default function HomePage() {
           const state = addr.state || '';
           const loc = `${city}${state ? `, ${state}` : ''}`;
           sessionStorage.setItem('prizzo_location', loc);
+          sessionStorage.setItem('prizzo_user_coords', JSON.stringify({ lat: coords.latitude, lng: coords.longitude }));
           setUserLocation(loc);
         } catch { setUserLocation('Shivamogga, Karnataka'); }
         finally { setLocationLoading(false); }
@@ -116,7 +117,25 @@ export default function HomePage() {
   });
   const nearbyStores = Array.from(map.values()).slice(0, 6);
 
+  const startVoiceSearch = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.start();
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      navigate(`/search?q=${encodeURIComponent(transcript)}`);
+    };
+  };
+
   if (loading) {
+// ... existing loading code
     return (
       <div className="min-h-dvh bg-white pb-nav">
         <div className="px-4 pt-6 space-y-4">
@@ -163,7 +182,11 @@ export default function HomePage() {
           className="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm cursor-pointer">
           <Search size={18} className="text-gray-400" />
           <span className="text-gray-400 text-sm flex-1">{t('Search groceries, medicines, food…')}</span>
-          <Mic size={18} className="text-orange-400" />
+          <Mic 
+            size={18} 
+            className="text-orange-400 cursor-pointer p-1 -m-1 hover:bg-orange-50 rounded-full" 
+            onClick={(e) => { e.stopPropagation(); startVoiceSearch(); }} 
+          />
         </motion.div>
       </div>
 
@@ -172,7 +195,7 @@ export default function HomePage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-base">{t('Categories')}</h2>
-            <button className="text-xs text-orange-500 font-medium">{t('See all')}</button>
+            <button onClick={() => navigate('/search')} className="text-xs text-orange-500 font-medium">{t('See all')}</button>
           </div>
           <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
             {categories.map(cat => (

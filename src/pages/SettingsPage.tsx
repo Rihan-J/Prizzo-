@@ -4,9 +4,18 @@ import { ArrowLeft, Bell, Globe, Shield, Download, Moon, HelpCircle } from 'luci
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('prizzo_dark_mode') === 'true');
   const [notif, setNotif] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('prizzo_dark_mode', String(darkMode));
+  }, [darkMode]);
 
   useEffect(() => {
     const handler = (e: Event) => {

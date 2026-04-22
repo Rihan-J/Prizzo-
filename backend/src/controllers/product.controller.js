@@ -34,7 +34,7 @@ const getAllProducts = async (req, res) => {
     }
 
     if (category && typeof category === "string" && category.trim().length > 0) {
-      where.category = category.trim().toLowerCase();
+      where.category = { equals: category.trim(), mode: "insensitive" };
     }
 
     // ── Fetch products — select only needed fields for list view ──

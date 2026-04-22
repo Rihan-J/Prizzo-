@@ -75,11 +75,29 @@ export function ProductCard({ product, compact }: { product: any; compact?: bool
   );
 }
 
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (R * c).toFixed(1);
+};
+
 export function StoreCard({ store }: { store: any }) {
   const navigate = useNavigate();
   const emoji = store.emoji || '🏪';
   const rating = store.rating || 4.2;
-  const distance = store.distance || 2.5;
+  
+  // Calculate real distance if lat/lng available
+  let distance = store.distance || 2.5;
+  const userCoords = JSON.parse(sessionStorage.getItem('prizzo_user_coords') || 'null');
+  if (userCoords && store.latitude && store.longitude) {
+    distance = calculateDistance(userCoords.lat, userCoords.lng, store.latitude, store.longitude);
+  }
+
   const pickupEta = store.pickupEta || 15;
   const isOpen = store.isOpen ?? true;
   const bgGradient = store.bgGradient || 'from-orange-100 to-amber-100';

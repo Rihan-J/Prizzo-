@@ -76,6 +76,12 @@ function NotFoundPage() {
 }
 
 export default function App() {
+  React.useEffect(() => {
+    if (localStorage.getItem('prizzo_dark_mode') === 'true') {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <LanguageProvider>
