@@ -93,10 +93,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // ── Flush batched qty updates ──
   const flushPendingUpdates = useCallback(async () => {
-    const updates = new Map(pendingUpdates.current);
+    const updates = Array.from(pendingUpdates.current.entries());
     pendingUpdates.current.clear();
 
+    if (updates.length === 0) return;
+
     for (const [cartItemId, qty] of updates) {
+      // Skip if it's a temp ID (it will be synced via the add response)
+      if (cartItemId.startsWith('temp-')) continue;
+
       try {
         if (qty <= 0) {
           await api.delete(`/cart/item/${cartItemId}`);
@@ -104,14 +109,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
           await api.patch(`/cart/item/${cartItemId}`, { quantity: qty });
         }
       } catch (error: any) {
-        console.error('Failed to sync qty update', error);
+        if (error.response?.status === 404) {
+          console.warn('Batch update skipped: Item already removed.', cartItemId);
+        } else {
+          console.error('Failed to sync qty update', error);
+        }
       }
     }
 
-    // Sync with server after all updates
-    if (updates.size > 0) {
-      await fetchCart();
-    }
+    // Final sync with server to ensure consistency
+    await fetchCart();
   }, [fetchCart]);
 
   const addItem = async (productId: string, qty: number, product?: any) => {
