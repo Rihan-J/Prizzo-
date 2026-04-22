@@ -74,7 +74,7 @@ export default function CartPage() {
             <AnimatePresence>
               {group.items.map(item => (
                 <motion.div
-                  key={item.productId}
+                  key={item.id}
                   layout
                   exit={{ opacity: 0, x: -80 }}
                   className="px-4 py-3 border-b border-gray-50 last:border-0"
@@ -94,20 +94,20 @@ export default function CartPage() {
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
-                        onClick={() => updateQty(item.productId, item.qty - 1)}
+                        onClick={() => updateQty(item.id, item.qty - 1)}
                         className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center active:scale-90 transition-transform"
                       >
                         <Minus size={13} />
                       </button>
                       <span className="text-sm font-semibold w-5 text-center tabular-nums">{item.qty}</span>
                       <button
-                        onClick={() => updateQty(item.productId, item.qty + 1)}
+                        onClick={() => updateQty(item.id, item.qty + 1)}
                         className="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center active:scale-90 transition-transform"
                       >
                         <Plus size={13} />
                       </button>
                       <button
-                        onClick={() => removeItem(item.productId)}
+                        onClick={() => removeItem(item.id)}
                         className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-red-400 transition-colors ml-0.5"
                       >
                         <Trash2 size={15} />
