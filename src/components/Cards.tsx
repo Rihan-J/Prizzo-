@@ -63,7 +63,7 @@ export function ProductCard({ product, compact }: { product: any; compact?: bool
           className="w-full h-full object-contain mix-blend-multiply" 
           loading="lazy" 
           onError={(e: any) => {
-            e.target.src = 'https://loremflickr.com/800/800/grocery,product';
+            e.target.src = 'https://tse1.mm.bing.net/th?q=grocery+product&w=800&h=800&c=7&rs=1&p=0&dpr=1&pid=1.7&mkt=en-US&adlt=on';
             e.target.onerror = null;
           }}
         />

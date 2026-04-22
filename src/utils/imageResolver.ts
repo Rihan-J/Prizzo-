@@ -5,11 +5,10 @@
  */
 
 export const getProductImage = (name: string, category?: string) => {
-  if (!name) return 'https://loremflickr.com/800/800/product,white,background';
+  if (!name) return 'https://tse1.mm.bing.net/th?q=product+placeholder&w=800&h=800&c=7&rs=1&p=0&dpr=1&pid=1.7&mkt=en-US&adlt=on';
 
-  // LoremFlickr is more reliable for direct URL search strings
-  const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, ',');
-  const cat = category ? `${category.toLowerCase()},` : '';
+  // Bing's Thumbnail API is highly accurate for real-world product images
+  const cleanName = encodeURIComponent(name.toLowerCase() + (category ? ` ${category}` : '') + ' white background');
   
-  return `https://loremflickr.com/800/800/${cat}${cleanName},product/all`;
+  return `https://tse1.mm.bing.net/th?q=${cleanName}&w=800&h=800&c=7&rs=1&p=0&dpr=1&pid=1.7&mkt=en-US&adlt=on`;
 };
