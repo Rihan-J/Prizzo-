@@ -15,7 +15,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (productId: string, qty: number) => Promise<void>;
+  addItem: (productId: string, qty: number, product?: any) => Promise<void>;
   removeItem: (cartItemId: string) => Promise<void>;
   updateQty: (cartItemId: string, qty: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -114,23 +114,53 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchCart]);
 
-  const addItem = async (productId: string, qty: number) => {
+  const addItem = async (productId: string, qty: number, product?: any) => {
     if (!isLoggedIn) {
       alert("Please login first to add items to your cart.");
       return;
     }
+
+    // Check if adding from a different store
+    if (cartStoreId && product?.storeId && cartStoreId !== product.storeId) {
+       if (!window.confirm("Adding this item will clear your current cart from another store. Continue?")) {
+           return;
+       }
+    }
+
+    // ── Optimistic Update ──
+    let tempId = 'temp-' + Date.now();
+    if (product) {
+      setItems(prev => {
+        const existing = prev.find(i => i.productId === productId);
+        if (existing) {
+          return prev.map(i => i.productId === productId ? { ...i, qty: i.qty + qty } : i);
+        }
+        return [...prev, {
+          id: tempId,
+          productId,
+          name: product.name,
+          price: product.price,
+          qty,
+          stock: product.stock || 99,
+          isAvailable: true
+        }];
+      });
+      setTotalItems(prev => prev + qty);
+      setSubtotal(prev => prev + (product.price * qty));
+    }
+
     try {
       const res = await api.post('/cart/add', { productId, quantity: qty });
-      // Server now returns updated cart — sync directly
       const cartData = res.data?.data?.cart || res.data?.cart;
       if (cartData) {
         syncFromServerResponse(cartData);
       } else {
         await fetchCart();
       }
-      // Invalidate product cache since stock might have been checked
       invalidateClientCache('products');
     } catch (error: any) {
+      // Rollback on error
+      await fetchCart();
       alert(error.response?.data?.error || error.response?.data?.message || "Failed to add to cart");
     }
   };

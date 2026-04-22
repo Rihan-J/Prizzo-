@@ -78,13 +78,9 @@ export default function ProductDetailPage() {
 
   // TODO: Implement real reviews via GET /products/:id/reviews when backend is ready
 
-  const handleAdd = async () => {
-    try {
-      await addItem(product.id, 1);
-      toast.show('Added to cart!', 'success');
-    } catch (e) {
-      // CartContext alerts internally but we do it gracefully here
-    }
+  const handleAdd = () => {
+    addItem(product.id, 1, product);
+    toast.show('Added to cart!', 'success');
   };
 
   return (

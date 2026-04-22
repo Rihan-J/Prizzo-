@@ -11,7 +11,7 @@ export function ProductCard({ product, compact }: { product: any; compact?: bool
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-    addItem(product.id, 1);
+    addItem(product.id, 1, product);
   };
 
   const emoji = product.emoji || '📦';
