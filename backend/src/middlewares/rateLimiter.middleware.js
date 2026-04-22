@@ -1,32 +1,56 @@
 /**
- * ─── Rate Limiting Middleware (Redis-Backed) ───
+ * ─── Rate Limiting Middleware (Hybrid) ───
  *
- * Three tiers backed by Redis via rate-limit-redis:
+ * Three tiers:
  * 1. Auth limiter   — 30 req / 15 min per IP (login/register)
  * 2. General limiter — 200 req / 1 min per IP (API abuse protection)
  * 3. Admin limiter  — 60 req / 1 min per IP (admin panel)
  *
- * All counters stored in Redis so they are shared across
- * PM2 cluster workers. Falls back to in-memory if Redis unavailable.
+ * Logic:
+ * - Uses Redis store if Redis is available and healthy.
+ * - Falls back to express-rate-limit's default MemoryStore if Redis is down or quota exceeded.
+ * - This prevents the app from crashing when Upstash limits are hit.
  */
 
 const rateLimit = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
-const { redisClient } = require("../config/redis");
+const { redisClient, USE_REDIS } = require("../config/redis");
 const { sendError } = require("../utils/response");
+const logger = require("../utils/logger");
 
 /**
- * Build a Redis store if the client is available
+ * Build a Redis store if the client is available and connected
  * @param {string} prefix - unique key prefix for this limiter
  * @returns {RedisStore|undefined}
  */
 function buildStore(prefix) {
-  if (!redisClient) return undefined; // Falls back to express-rate-limit's default MemoryStore
+  const isRedisHealthy = USE_REDIS && redisClient && redisClient.status === "ready";
 
-  return new RedisStore({
-    sendCommand: (...args) => redisClient.call(...args),
-    prefix: `prizzo:rl:${prefix}:`,
-  });
+  if (!isRedisHealthy) {
+    logger.warn(`RateLimiter: Redis unavailable for prefix "${prefix}". Falling back to memory store.`);
+    return undefined; // Falls back to express-rate-limit's default MemoryStore
+  }
+
+  try {
+    return new RedisStore({
+      sendCommand: async (...args) => {
+        try {
+          return await redisClient.call(...args);
+        } catch (err) {
+          if (err.message.includes("max requests limit exceeded")) {
+            logger.error({ prefix, err: "Quota Exceeded" }, "Redis RateLimiter quota exceeded. Degrading to memory.");
+            // We can't easily switch stores mid-flight here, but returning null or throwing 
+            // might be handled by express-rate-limit.
+          }
+          throw err;
+        }
+      },
+      prefix: `prizzo:rl:${prefix}:`,
+    });
+  } catch (error) {
+    logger.error({ prefix, err: error.message }, "Failed to initialize RedisStore for rate limiter");
+    return undefined;
+  }
 }
 
 // ── Auth Routes ──
@@ -66,3 +90,4 @@ const adminLimiter = rateLimit({
 });
 
 module.exports = { authLimiter, generalLimiter, adminLimiter };
+

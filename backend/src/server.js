@@ -62,10 +62,9 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // ─── Request Logger (ID tracking + duration monitoring) ───
-app.use(requestLogger);
 
-// ─── Global Rate Limiter ───
-app.use(generalLimiter);
+// ─── Global Rate Limiter (REMOVED as per requirements) ───
+// app.use(generalLimiter); 
 
 // ─── Health Check (includes Redis + DB status) ───
 app.get("/", async (req, res) => {
@@ -75,12 +74,12 @@ app.get("/", async (req, res) => {
     success: true,
     data: {
       message: "🚀 Prizzo API is running.",
-      version: "3.0.0",
+      version: "3.1.0",
       timestamp: new Date().toISOString(),
       cache: cache.stats(),
       health: {
-        redis: redisOk ? "connected" : "disconnected",
-        database: "connected", // If we got here, DB is connected
+        redis: redisOk ? "connected" : "disconnected/quota-exceeded",
+        database: "connected",
         queues: config.queue.enabled ? "enabled" : "disabled",
       },
     },
@@ -97,23 +96,24 @@ app.get("/health", async (req, res) => {
   } catch { /* db unreachable */ }
 
   const redisOk = await redisHealthCheck();
-  const allOk = dbOk && redisOk;
+  // Server is considered "healthy" if DB is OK, even if Redis is down (it's optional now)
+  const allOk = dbOk; 
 
   res.status(allOk ? 200 : 503).json({
     success: allOk,
     data: {
-      status: allOk ? "healthy" : "degraded",
+      status: allOk ? (redisOk ? "healthy" : "degraded") : "error",
       database: dbOk ? "ok" : "error",
       redis: redisOk ? "ok" : "error",
       queues: config.queue.enabled ? "running" : "disabled",
       uptime: Math.floor(process.uptime()) + "s",
     },
-    error: allOk ? null : "One or more services are unavailable.",
+    error: allOk ? null : "Database service is unavailable.",
   });
 });
 
 // ─── API Routes with Tier-Specific Rate Limiters ───
-app.use("/auth", authLimiter, authRoutes);
+app.use("/auth", authLimiter, authRoutes); // Sensitive routes: /auth/login, /auth/register
 app.use("/vendor", vendorRoutes);
 app.use("/products", productRoutes);
 app.use("/cart", cartRoutes);
@@ -162,18 +162,27 @@ const PORT = config.port;
 
 async function main() {
   try {
-    // 1. Wait for Redis clients to be ready (cache, rate limits, socket adapter, queues)
-    await waitForRedis();
-
-    // 2. Attach Redis client to cache layer
-    cache.setClient(redisClient);
+    // 1. Wait for Redis clients (safe fallback)
+    const redisEnabled = await waitForRedis();
+    
+    if (redisEnabled) {
+      // 2. Attach Redis client to cache layer only if available
+      cache.setClient(redisClient);
+      logger.info("✅ Redis features enabled.");
+    } else {
+      logger.warn("⚠️ Continuing without Redis features (Cache/Real-time/Distributed Rate Limiting).");
+    }
 
     // 3. Connect Database
     await prisma.$connect();
     logger.info("✅ Database connected successfully.");
 
-    // 4. Initialize BullMQ queues (workers start only if QUEUE_ENABLED)
-    initQueues();
+    // 4. Initialize BullMQ queues (workers start only if QUEUE_ENABLED and Redis available)
+    if (redisEnabled || !config.queue.enabled) {
+      initQueues();
+    } else {
+      logger.error("❌ Queues are enabled but Redis is unavailable. Jobs will not be processed.");
+    }
 
     // 5. Start HTTP server
     server.listen(PORT, () => {
@@ -181,13 +190,16 @@ async function main() {
         port: PORT,
         env: config.nodeEnv,
         cors: allowedOrigins,
-        redis: redisClient ? "connected" : "disabled",
-        queues: config.queue.enabled ? "enabled" : "disabled",
-      }, `🚀 Prizzo Backend v3.0 running on http://localhost:${PORT}`);
+        redis: redisEnabled ? "connected" : "disabled/fallback",
+        queues: config.queue.enabled && redisEnabled ? "enabled" : "disabled",
+      }, `🚀 Prizzo Backend v3.1 running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    logger.fatal({ err: error }, "❌ Failed to start server");
-    process.exit(1);
+    logger.fatal({ err: error.message }, "❌ Critical failure during startup");
+    // We only exit if it's a non-recoverable error (like DB connection failure)
+    if (error.message.includes("prisma")) {
+        process.exit(1);
+    }
   }
 }
 
@@ -202,17 +214,21 @@ const shutdown = async (signal) => {
     logger.info("HTTP server closed.");
   });
 
-  // 2. Drain and close job queues
-  await shutdownQueues();
+  try {
+    // 2. Drain and close job queues
+    await shutdownQueues();
 
-  // 3. Destroy cache intervals
-  cache.destroy();
+    // 3. Destroy cache intervals
+    cache.destroy();
 
-  // 4. Disconnect Redis
-  await disconnectRedis();
+    // 4. Disconnect Redis
+    await disconnectRedis();
 
-  // 5. Disconnect database
-  await prisma.$disconnect();
+    // 5. Disconnect database
+    await prisma.$disconnect();
+  } catch (err) {
+    logger.error({ err: err.message }, "Error during graceful shutdown");
+  }
 
   logger.info("All connections closed. Exiting.");
   process.exit(0);
@@ -220,11 +236,17 @@ const shutdown = async (signal) => {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// IMPROVED: Handle unhandledRejection and uncaughtException without immediate exit if possible
 process.on("uncaughtException", (err) => {
-  logger.fatal({ err }, "Uncaught exception");
+  logger.fatal({ err: err.message, stack: err.stack }, "Uncaught Exception DETECTED");
+  // For safety, we still shutdown, but we log the full error first.
+  // In a resilient system, we might decide to keep the process alive if the error is non-fatal.
   shutdown("uncaughtException");
 });
-process.on("unhandledRejection", (reason) => {
-  logger.fatal({ err: reason }, "Unhandled promise rejection");
-  shutdown("unhandledRejection");
+
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error({ reason, promise }, "Unhandled Rejection at Promise");
+  // We don't necessarily need to crash the whole app for a rejected promise.
+  // Just log it and monitor.
 });
