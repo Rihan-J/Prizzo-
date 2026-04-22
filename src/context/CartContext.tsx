@@ -128,7 +128,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     // ── Optimistic Update ──
-    let tempId = 'temp-' + Date.now();
     if (product) {
       setItems(prev => {
         const existing = prev.find(i => i.productId === productId);
@@ -136,7 +135,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return prev.map(i => i.productId === productId ? { ...i, qty: i.qty + qty } : i);
         }
         return [...prev, {
-          id: tempId,
+          id: 'temp-' + Date.now(), // Unique enough for a split second
           productId,
           name: product.name,
           price: product.price,
@@ -165,9 +164,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const inFlightDeletes = useRef(new Set<string>());
+
   const removeItem = async (cartItemId: string) => {
+    if (inFlightDeletes.current.has(cartItemId)) return;
+    
+    // If it's a temp ID, we might need to wait for the real ID from the server
+    // or just ignore if it's not even on the server yet.
+    if (cartItemId.startsWith('temp-')) {
+       setItems(prev => prev.filter(i => i.id !== cartItemId));
+       return;
+    }
+
+    inFlightDeletes.current.add(cartItemId);
     // Optimistic removal
     setItems(prev => prev.filter(i => i.id !== cartItemId));
+
     try {
       const res = await api.delete(`/cart/item/${cartItemId}`);
       const cartData = res.data?.data?.cart || res.data?.cart;
@@ -176,9 +188,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         await fetchCart();
       }
-    } catch (error) {
-      console.error('Failed to remove item', error);
-      await fetchCart(); // Rollback by re-fetching
+    } catch (error: any) {
+      // If it's a 404, the item was likely already removed, so we can just ignore it
+      if (error.response?.status === 404) {
+          console.warn('Item already removed from server:', cartItemId);
+      } else {
+          console.error('Failed to remove item', error);
+          await fetchCart(); // Rollback for other errors
+      }
+    } finally {
+      inFlightDeletes.current.delete(cartItemId);
     }
   };
 
