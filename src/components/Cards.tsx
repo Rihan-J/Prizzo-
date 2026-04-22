@@ -24,40 +24,40 @@ export function ProductCard({ product }: { product: any }) {
     <motion.div 
       whileTap={{ scale: 0.98 }} 
       onClick={() => navigate(`/product/${product.id}`)}
-      className="bg-white rounded-2xl p-3 shadow-card cursor-pointer relative border border-[#f0ede9] flex flex-col h-full"
+      className="bg-white rounded-xl p-3 shadow-md cursor-pointer relative border border-[#f0ede9] flex flex-col h-full hover:shadow-lg transition-shadow"
     >
       <button 
         onClick={(e) => { e.stopPropagation(); toggle(product.id); }} 
-        className="absolute top-2 right-2 z-10 p-1.5"
+        className="absolute top-2 right-2 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm"
       >
-        <Heart size={16} className={isWished(product.id) ? 'fill-[#e63946] text-[#e63946]' : 'text-[#8e8e8e]'} />
+        <Heart size={14} className={isWished(product.id) ? 'fill-[#e63946] text-[#e63946]' : 'text-[#8e8e8e]'} />
       </button>
 
-      <div className="w-full aspect-square bg-[#F8F6F3] rounded-xl flex items-center justify-center text-5xl mb-3">
+      <div className="w-full aspect-square bg-[#F8F6F3] rounded-lg flex items-center justify-center text-6xl mb-4 group-hover:scale-105 transition-transform duration-300">
         {emoji}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-semibold text-[#1E1E1E] leading-tight line-clamp-2 mb-1">
-          {product.name}
-        </h3>
-        
-        <div className="flex items-center gap-1 mb-2">
-          <span className="text-[10px] flex items-center gap-0.5 text-[#8e8e8e]">
-            <Star size={10} className="text-[#FF6A00] fill-[#FF6A00]" /> {rating}
-          </span>
-          <span className="text-[10px] text-[#8e8e8e]">•</span>
-          <span className="text-[10px] text-[#FF6A00] font-medium bg-[#fff1e6] px-1.5 py-0.5 rounded-md">
-            {pickupEta} min pickup
-          </span>
+      <div className="flex-1 flex flex-col justify-between">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-[#1E1E1E] leading-tight line-clamp-2">
+            {product.name}
+          </h3>
+          <div className="flex items-center gap-1">
+            <Star size={10} className="text-[#FF6A00] fill-[#FF6A00]" />
+            <span className="text-[10px] font-bold text-[#1E1E1E]">{rating}</span>
+            <span className="text-[10px] text-[#8e8e8e] ml-1">{pickupEta} min</span>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between mt-auto">
-          <span className="text-base font-bold text-[#1E1E1E]">₹{price}</span>
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex flex-col">
+            <span className="text-xs text-[#8e8e8e] font-medium">₹{price + 10}</span>
+            <span className="text-lg font-black text-[#1E1E1E]">₹{price}</span>
+          </div>
           <button 
             onClick={handleAdd} 
             disabled={!inStock}
-            className="bg-white border border-[#FF6A00] text-[#FF6A00] text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#fff1e6] transition-colors active:scale-95 disabled:opacity-50 disabled:border-[#8e8e8e] disabled:text-[#8e8e8e]"
+            className="bg-[#fff1e6] text-[#FF6A00] text-xs font-black px-4 py-2 rounded-full hover:bg-[#ffe2cc] transition-colors active:scale-95 disabled:opacity-50"
           >
             + Add
           </button>
@@ -95,29 +95,31 @@ export function StoreCard({ store }: { store: any }) {
     <motion.div 
       whileTap={{ scale: 0.98 }} 
       onClick={() => navigate(`/store/${store.id}`)}
-      className="bg-white rounded-2xl p-3 shadow-card cursor-pointer border border-[#f0ede9] flex gap-4 items-center"
+      className="bg-white rounded-2xl p-4 shadow-sm cursor-pointer border border-[#f0ede9] flex gap-4 items-center hover:shadow-md transition-shadow"
     >
-      <div className="w-16 h-16 bg-[#F8F6F3] rounded-xl flex items-center justify-center text-3xl flex-shrink-0">
+      <div className="w-20 h-20 bg-[#F8F6F3] rounded-2xl flex items-center justify-center text-4xl flex-shrink-0 border border-[#f0ede9]">
         {emoji}
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 py-1">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-sm text-[#1E1E1E] truncate">{store.name}</h3>
-          <span className="text-[11px] font-bold text-[#FF6A00] bg-[#fff1e6] px-2 py-0.5 rounded-full">
-            {distance} km away
+          <h3 className="font-black text-base text-[#1E1E1E] truncate">{store.name}</h3>
+          <span className="text-xs font-black text-[#FF6A00] bg-[#fff1e6] px-3 py-1 rounded-full">
+            {distance} km
           </span>
         </div>
-        <div className="flex items-center gap-3 mt-1.5 text-xs">
-          <span className="flex items-center gap-0.5 font-medium">
+        <div className="flex items-center gap-4 mt-2 text-xs font-bold">
+          <span className="flex items-center gap-1">
             <Star size={12} className="text-[#FF6A00] fill-[#FF6A00]" /> {rating}
           </span>
           <span className="text-[#8e8e8e]">•</span>
-          <span className={isOpen ? 'text-[#1ab34e] font-semibold' : 'text-[#e63946] font-semibold'}>
+          <span className={isOpen ? 'text-[#1ab34e]' : 'text-[#e63946]'}>
             {isOpen ? 'Open Now' : 'Closed'}
           </span>
         </div>
+        <div className="mt-2 text-[10px] text-[#8e8e8e] font-medium flex items-center gap-1">
+          <MapPin size={10} /> {store.address || 'Shivamogga, Karnataka'}
+        </div>
       </div>
-      <ChevronRight size={18} className="text-[#8e8e8e]" />
     </motion.div>
   );
 }
