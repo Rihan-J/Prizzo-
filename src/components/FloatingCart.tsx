@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
@@ -9,9 +9,10 @@ export default function FloatingCart() {
   const { totalItems, subtotal } = useCart();
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
-  if (isAdmin) return null;
+  if (isAdmin || location.pathname === '/cart') return null;
 
   return (
     <AnimatePresence>
