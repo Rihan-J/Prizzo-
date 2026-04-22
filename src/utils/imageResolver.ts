@@ -5,11 +5,11 @@
  */
 
 export const getProductImage = (name: string, category?: string) => {
-  if (!name) return 'https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=800&auto=format&fit=crop';
+  if (!name) return 'https://loremflickr.com/800/800/product,white,background';
 
-  const cleanName = name.toLowerCase().replace(/\s+/g, ',');
-  const cat = category ? `${category},` : '';
+  // LoremFlickr is more reliable for direct URL search strings
+  const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, ',');
+  const cat = category ? `${category.toLowerCase()},` : '';
   
-  // Using a robust Unsplash URL pattern that tends to give professional product shots
-  return `https://source.unsplash.com/featured/800x800/?${cat}${cleanName},product,white-background`;
+  return `https://loremflickr.com/800/800/${cat}${cleanName},product/all`;
 };

@@ -102,7 +102,15 @@ export default function ProductDetailPage() {
       {/* Product Image */}
       <div className="bg-white h-72 flex items-center justify-center p-8 relative overflow-hidden">
         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full relative z-10">
-          <img src={imageUrl} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" />
+          <img 
+            src={imageUrl} 
+            alt={product.name} 
+            className="w-full h-full object-contain mix-blend-multiply" 
+            onError={(e: any) => {
+              e.target.src = 'https://loremflickr.com/800/800/grocery,product';
+              e.target.onerror = null;
+            }}
+          />
         </motion.div>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50/50" />
       </div>

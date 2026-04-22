@@ -57,7 +57,16 @@ export function ProductCard({ product, compact }: { product: any; compact?: bool
         <Heart size={18} className={isWished(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-300'} />
       </button>
       <div className="w-24 h-24 bg-gray-50 rounded-2xl overflow-hidden flex-shrink-0 relative">
-        <img src={imageUrl} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+        <img 
+          src={imageUrl} 
+          alt={product.name} 
+          className="w-full h-full object-contain mix-blend-multiply" 
+          loading="lazy" 
+          onError={(e: any) => {
+            e.target.src = 'https://loremflickr.com/800/800/grocery,product';
+            e.target.onerror = null;
+          }}
+        />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{brand}</p>
