@@ -35,11 +35,12 @@ app.use(helmet());
 // ─── CORS — Restricted Origins ───
 const allowedOrigins = config.nodeEnv === "production"
   ? [
-      process.env.CORS_ORIGIN,
-      "https://prizzo-in.vercel.app", 
-      "https://prizzo.vercel.app", 
-      "https://prizzo-chi.vercel.app"
-    ].filter(Boolean)
+    process.env.CORS_ORIGIN,
+    "https://prizzo-in.vercel.app",
+    "https://prizzo.vercel.app",
+    "https://prizzo-p7ju-hgzq69a7t-rihanj27pvt-4651s-projects.vercel.app",
+    "https://prizzo-chi.vercel.app"
+  ].filter(Boolean)
   : ["http://localhost:5173"];
 
 app.use(cors({
@@ -97,7 +98,7 @@ app.get("/health", async (req, res) => {
 
   const redisOk = await redisHealthCheck();
   // Server is considered "healthy" if DB is OK, even if Redis is down (it's optional now)
-  const allOk = dbOk; 
+  const allOk = dbOk;
 
   res.status(allOk ? 200 : 503).json({
     success: allOk,
@@ -164,7 +165,7 @@ async function main() {
   try {
     // 1. Wait for Redis clients (safe fallback)
     const redisEnabled = await waitForRedis();
-    
+
     if (redisEnabled) {
       // 2. Attach Redis client to cache layer only if available
       cache.setClient(redisClient);
@@ -198,7 +199,7 @@ async function main() {
     logger.fatal({ err: error.message }, "❌ Critical failure during startup");
     // We only exit if it's a non-recoverable error (like DB connection failure)
     if (error.message.includes("prisma")) {
-        process.exit(1);
+      process.exit(1);
     }
   }
 }
