@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Package, ShoppingBag, Bell, AlertTriangle, Clock, DollarSign, Plus, X, Edit, Trash2, ToggleLeft, ToggleRight, TrendingUp } from 'lucide-react';
+import { Home, Package, ShoppingBag, Bell, AlertTriangle, Clock, DollarSign, Plus, X, Edit, Trash2, ToggleLeft, ToggleRight, TrendingUp, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { useNewOrderAlerts } from '../hooks/useSocket';
@@ -12,30 +12,36 @@ const vendorTabs = [
   { id: 'products', icon: Package, label: 'Products' }
 ];
 
+// URL for a loud, repetitive notification sound (Service Bell)
+const NOTIFICATION_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; 
+
 export default function VendorDashboard() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [tab, setTab] = useState('overview');
   const [hasStore, setHasStore] = useState<boolean | null>(null);
 
-  // ── Shared state: lift data fetching to parent to avoid duplicate calls ──
+  // ── Shared state ──
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
 
+  // ── Incoming Order Alert State ──
+  const [incomingOrder, setIncomingOrder] = useState<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const token = typeof window !== 'undefined' ? localStorage.getItem('prizzo_token') : null;
 
-  const fetchSharedData = useCallback(async () => {
+  const fetchSharedData = useCallback(async (silent = false) => {
     try {
-      setDataLoading(true);
+      if (!silent) setDataLoading(true);
       const storeRes = await api.get('/vendor/store');
       const storeData = storeRes.data?.data || storeRes.data;
       if (storeData?.store) {
         setHasStore(true);
         setStoreId(storeData.store.id);
 
-        // Fetch orders and products ONLY after confirming store exists
         const [ordRes, prdRes] = await Promise.all([
           api.get('/orders/vendor?limit=50'),
           api.get('/vendor/products')
@@ -56,13 +62,62 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     fetchSharedData();
+    
+    // Request notification permission
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }, [fetchSharedData]);
 
+  // Initialize audio
+  useEffect(() => {
+    audioRef.current = new Audio(NOTIFICATION_SOUND_URL);
+    audioRef.current.loop = true;
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playNotificationSound = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => console.warn("Audio play blocked by browser:", e));
+    }
+  };
+
+  const stopNotificationSound = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
   // ── Socket.IO: Real-time new order alerts ──
-  useNewOrderAlerts(token, storeId, (_data) => {
-    // Refresh orders when a new order comes in
-    fetchSharedData();
+  useNewOrderAlerts(token, storeId, (data) => {
+    console.log("🚀 New Order Received:", data);
+    setIncomingOrder(data);
+    playNotificationSound();
+    fetchSharedData(true); // Silent refresh
+
+    // Browser notification
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("🚀 New Prizzo Order!", {
+        body: `New order #${data.orderId.substring(0,8).toUpperCase()} for ₹${data.totalAmount}`,
+        icon: "/icons/favicon.svg",
+        tag: "new-order",
+        renotify: true
+      });
+    }
   });
+
+  const handleAcceptOrder = () => {
+    stopNotificationSound();
+    setIncomingOrder(null);
+    setTab('orders'); // Switch to orders tab
+  };
 
   const handleLogout = () => {
     logout();
@@ -115,6 +170,68 @@ export default function VendorDashboard() {
           </div>
         </>
       )}
+
+      {/* ── Real-time Incoming Order Alert Modal (Swiggy Style) ── */}
+      <AnimatePresence>
+        {incomingOrder && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center px-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl relative"
+            >
+              {/* Pulsing Background for Urgency */}
+              <motion.div 
+                animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.3, 0.1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="absolute inset-0 bg-orange-500 pointer-events-none"
+              />
+
+              <div className="p-8 text-center relative z-10">
+                <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                  <motion.div
+                    animate={{ rotate: [0, -10, 10, -10, 10, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
+                  >
+                    <ShoppingBag size={40} className="text-orange-600" />
+                  </motion.div>
+                </div>
+
+                <h2 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">New Order! 🚀</h2>
+                <p className="text-gray-500 text-sm mb-6 font-medium">Customer is waiting for your response</p>
+
+                <div className="bg-gray-50 rounded-2xl p-5 mb-8 border border-gray-100 shadow-sm">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Order ID</span>
+                    <span className="text-sm font-mono font-bold text-gray-800">#{incomingOrder.orderId.substring(0,8).toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Total Amount</span>
+                    <span className="text-xl font-black text-orange-600">₹{incomingOrder.totalAmount}</span>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleAcceptOrder}
+                  className="w-full bg-orange-500 hover:bg-orange-600 active:scale-95 text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center gap-3"
+                >
+                  <CheckCircle size={24} />
+                  Accept & View
+                </button>
+                
+                <button 
+                  onClick={() => { stopNotificationSound(); setIncomingOrder(null); }}
+                  className="mt-4 text-gray-400 text-sm font-semibold hover:text-gray-600 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -689,3 +806,4 @@ function MapLocationPicker({ initialLat, initialLng, onPick, onClose }: {
     </div>
   );
 }
+
