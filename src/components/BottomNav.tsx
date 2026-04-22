@@ -25,21 +25,25 @@ export default function BottomNav() {
   if (isAdmin || user?.role === 'VENDOR') return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-lg border-t border-gray-100 z-50 safe-bottom">
-      <div className="flex items-center justify-around py-2">
+    <nav className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-[#f0ede9] z-50 safe-bottom">
+      <div className="flex items-center justify-around py-3">
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
           return (
-            <NavLink key={to} to={to} className="relative flex flex-col items-center gap-0.5 px-3 py-1">
+            <NavLink key={to} to={to} className="relative flex flex-col items-center gap-1 min-w-[64px]">
               <div className="relative">
-                <Icon size={22} className={isActive ? 'text-orange-500' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 1.8} />
+                <Icon size={24} className={isActive ? 'text-[#FF6A00]' : 'text-[#8e8e8e]'} strokeWidth={1.5} />
                 {label === 'Orders' && totalItems > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{totalItems}</span>
+                  <span className="absolute -top-1 -right-1 bg-[#FF6A00] text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">{totalItems}</span>
                 )}
               </div>
-              <span className={`text-[10px] font-medium ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>{t(label)}</span>
+              <span className={`text-[10px] font-bold tracking-tight ${isActive ? 'text-[#FF6A00]' : 'text-[#8e8e8e]'}`}>{t(label)}</span>
               {isActive && (
-                <motion.div layoutId="nav-dot" className="absolute -top-0.5 w-1 h-1 rounded-full bg-orange-500" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                <motion.div 
+                  layoutId="nav-indicator" 
+                  className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#FF6A00]" 
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }} 
+                />
               )}
             </NavLink>
           );
