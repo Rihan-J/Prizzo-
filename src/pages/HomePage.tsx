@@ -191,40 +191,6 @@ export default function HomePage() {
       </div>
 
       <div className="px-4 mt-5 space-y-6">
-        {/* Categories */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-base">{t('Categories')}</h2>
-            <button onClick={() => navigate('/search')} className="text-xs text-orange-500 font-medium">{t('See all')}</button>
-          </div>
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-            {categories.map(cat => (
-              <motion.button whileTap={{ scale: 0.92 }} key={cat.id}
-                onClick={() => navigate(`/search?category=${cat.id}`)}
-                className="flex flex-col items-center gap-1.5 min-w-[68px]">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ backgroundColor: cat.bgColor }}>
-                  {cat.icon}
-                </div>
-                <span className="text-[10px] font-medium text-gray-600 text-center leading-tight">{t(cat.name)}</span>
-              </motion.button>
-            ))}
-          </div>
-        </div>
-
-        {/* Hero Banner */}
-        <motion.div key={bannerIdx} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-          onClick={() => navigate(BANNERS[bannerIdx].link)}
-          className={`bg-gradient-to-r ${BANNERS[bannerIdx].bgGradient} rounded-2xl p-5 relative overflow-hidden cursor-pointer min-h-[120px]`}>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-6xl opacity-20">{BANNERS[bannerIdx].emoji}</div>
-          <h3 className="text-white font-bold text-lg relative z-10">{BANNERS[bannerIdx].title}</h3>
-          <p className="text-white/80 text-xs mt-1 relative z-10">{BANNERS[bannerIdx].subtitle}</p>
-          <button className="mt-3 bg-white/25 text-white text-xs font-medium px-4 py-2 rounded-xl relative z-10 backdrop-blur-sm">
-            {BANNERS[bannerIdx].cta} →
-          </button>
-          <div className="flex gap-1 mt-3">
-            {BANNERS.map((_, i) => <div key={i} className={`h-1 rounded-full ${i === bannerIdx ? 'w-6 bg-white' : 'w-2 bg-white/40'} transition-all`} />)}
-          </div>
-        </motion.div>
 
         {/* AI Suggestion Box */}
         <div className="bg-orange-50 rounded-2xl p-4">
