@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, Mic, Bell, ChevronRight, Globe, Check, X, MessageCircle } from 'lucide-react';
+import { Search, MapPin, Mic, Bell, ChevronRight, Sparkles, Globe, Check, X, Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryList } from '../config/categoryConfig';
@@ -150,81 +150,115 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#F8F6F3] pb-nav">
-      {/* 🔶 Structured Header */}
-      <header className="px-6 pt-10 pb-6 bg-[#F8F6F3]">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-[900] text-[#1E1E1E] tracking-tight leading-none">
-              Hi Farhan 👋
-            </h1>
-            <button onClick={() => navigate('/search')} className="flex items-center gap-1 text-[12px] text-[#8e8e8e] font-semibold">
-              <MapPin size={12} className="text-[#FF6A00]" />
-              <span className="truncate max-w-[200px]">{userLocation || 'Detecting location...'}</span>
-              <ChevronRight size={12} />
-            </button>
+    <div className="min-h-dvh bg-white pb-nav">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-orange-500 to-orange-600 px-4 pt-5 pb-6 rounded-b-[1.5rem] relative overflow-hidden">
+        <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 6, repeat: Infinity }}
+          className="absolute w-48 h-48 bg-white/5 rounded-full -top-16 -right-12" />
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          <div>
+            <p className="text-white/80 text-xs font-medium">{t('Good')} {new Date().getHours() < 12 ? t('Morning') : new Date().getHours() < 17 ? t('Afternoon') : t('Evening')} 👋</p>
+            <h1 className="text-white font-bold text-lg">{user?.name || t('Guest')}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowLanguageModal(true)} className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-[#f0ede9] text-[#1E1E1E] transition-transform active:scale-95">
-              <Globe size={20} />
+            <button onClick={() => setShowLanguageModal(true)} className="bg-white/15 text-white p-2 rounded-xl backdrop-blur-sm flex items-center justify-center">
+              <Globe size={18} className="text-white" />
             </button>
-            <button onClick={() => navigate('/notifications')} className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-[#f0ede9] text-[#1E1E1E] transition-transform active:scale-95">
-              <Bell size={20} />
+            <button onClick={() => navigate('/notifications')} className="relative bg-white/15 p-2 rounded-xl backdrop-blur-sm">
+              <Bell size={18} className="text-white" />
             </button>
           </div>
         </div>
-      </header>
-
-      {/* 🔍 Dominant Search Bar */}
-      <div className="px-6 pb-4 sticky top-0 z-30 bg-[#F8F6F3]/95 backdrop-blur-md">
-        <motion.div 
-          whileTap={{ scale: 0.98 }} 
-          onClick={() => navigate('/search')}
-          className="bg-white rounded-[20px] px-5 py-4.5 flex items-center gap-4 shadow-lg cursor-pointer border border-[#f0ede9] transition-all"
-        >
-          <Search size={22} className="text-[#FF6A00]" />
-          <span className="text-[#8e8e8e] text-base font-semibold flex-1 truncate">
-            Search groceries, medicine, or stores
-          </span>
-          <div className="w-px h-6 bg-gray-100" />
-          <button 
-            onClick={(e) => { e.stopPropagation(); startVoiceSearch(); }}
-            className="p-1 hover:bg-orange-50 rounded-full transition-colors"
-          >
-            <Mic size={22} className="text-[#8e8e8e]" />
-          </button>
+        <button onClick={() => navigate('/search')} className="flex items-center gap-0.5 text-white/70 text-xs mb-3">
+          <MapPin size={12} />
+          {locationLoading ? (
+            <span className="flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Detecting…</span>
+          ) : (
+            <span>{userLocation}</span>
+          )}
+          <ChevronRight size={12} />
+        </button>
+        <motion.div whileTap={{ scale: 0.98 }} onClick={() => navigate('/search')}
+          className="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm cursor-pointer">
+          <Search size={18} className="text-gray-400" />
+          <span className="text-gray-400 text-sm flex-1">{t('Search groceries, medicines, food…')}</span>
+          <Mic 
+            size={18} 
+            className="text-orange-400 cursor-pointer p-1 -m-1 hover:bg-orange-50 rounded-full" 
+            onClick={(e) => { e.stopPropagation(); startVoiceSearch(); }} 
+          />
         </motion.div>
       </div>
 
-      <div className="px-6 mt-4 space-y-12 pb-10">
-        {/* ✨ Ultra-light Suggestion Chips */}
-        <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1">
-          {AI_SUGGESTIONS.map(s => (
-            <motion.button 
-              key={s.query}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(`/search?q=${s.query}`)}
-              className="bg-white px-4 py-2 rounded-xl shadow-sm border border-[#f0ede9] text-[#1E1E1E] text-[12px] font-bold whitespace-nowrap flex items-center gap-2 hover:bg-[#fff1e6] hover:border-[#FF6A00]/20 transition-all"
-            >
-              <span className="grayscale opacity-40 text-sm">{s.emoji}</span>
-              {s.text.replace('?', '')}
-            </motion.button>
-          ))}
+      <div className="px-4 mt-5 space-y-6">
+
+        {/* AI Suggestion Box */}
+        <div className="bg-orange-50 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={16} className="text-orange-500" />
+            <span className="text-sm font-semibold text-gray-800">{t('What are you looking for today?')}</span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {AI_SUGGESTIONS.map(s => (
+              <motion.button whileTap={{ scale: 0.95 }} key={s.query}
+                onClick={() => navigate(`/search?q=${s.query}`)}
+                className="bg-white text-xs px-3 py-2 rounded-xl text-gray-700 font-medium shadow-sm hover:shadow-md transition-shadow flex items-center gap-1.5">
+                 {s.emoji} {s.text}
+              </motion.button>
+            ))}
+          </div>
         </div>
 
-        {/* 🔥 Trending Products */}
-        <Section title="🔥 Trending Products" onSeeAll={() => navigate('/search')}>
-          <div className="grid grid-cols-2 gap-3">
-            {trending.map(p => <ProductCard key={p.id} product={p} />)}
-          </div>
-        </Section>
+        {/* Trending */}
+        {trending.length > 0 && (
+          <Section title={t('🔥 Trending Products')} onSeeAll={() => navigate('/search?sort=popular')}>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
+              {trending.map(p => <ProductCard key={p.id} product={p} compact />)}
+            </div>
+          </Section>
+        )}
 
-        {/* 📍 Nearby Stores */}
-        <Section title="📍 Best Pickup Stores" onSeeAll={() => navigate('/search?tab=stores')}>
-          <div className="space-y-3">
-            {nearbyStores.map((s: any) => <StoreCard key={s.id} store={s} />)}
-          </div>
-        </Section>
+        {/* Nearby Stores extracted from products list */}
+        {nearbyStores.length > 0 && (
+          <Section title={t('📍 Best Pickup Stores Near You')} onSeeAll={() => navigate('/search?tab=stores')}>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
+              {nearbyStores.map((s: any) => <StoreCard key={s.id} store={s} />)}
+            </div>
+          </Section>
+        )}
+
+        {/* General items */}
+        {foodItems.length > 0 && (
+          <Section title={t('🍽️ Restaurant Dishes')} onSeeAll={() => navigate('/search?category=food')}>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
+              {foodItems.map(p => <ProductCard key={p.id} product={p} compact />)}
+            </div>
+          </Section>
+        )}
+
+        {pharma.length > 0 && (
+          <Section title={t('💊 Pharmacy Essentials')} onSeeAll={() => navigate('/search?category=medicine')}>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
+              {pharma.map(p => <ProductCard key={p.id} product={p} compact />)}
+            </div>
+          </Section>
+        )}
+
+        {elec.length > 0 && (
+          <Section title={t('📱 Electronics Picks')} onSeeAll={() => navigate('/search?category=electronics')}>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
+              {elec.map(p => <ProductCard key={p.id} product={p} compact />)}
+            </div>
+          </Section>
+        )}
+
+        {grocery.length > 0 && (
+          <Section title={t('🛒 Grocery Essentials')} onSeeAll={() => navigate('/search?category=grocery')}>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
+              {grocery.map(p => <ProductCard key={p.id} product={p} compact />)}
+            </div>
+          </Section>
+        )}
 
         {/* Empty state when no products at all */}
         {products.length === 0 && !loading && (
@@ -281,32 +315,18 @@ export default function HomePage() {
           </>
         )}
       </AnimatePresence>
-
-      {/* 💬 Simple Floating Chat Button */}
-      <button 
-        onClick={() => navigate('/help')}
-        className="fixed bottom-24 right-4 z-40 w-12 h-12 bg-white text-[#FF6A00] rounded-full shadow-float flex items-center justify-center border border-[#f0ede9] hover:scale-105 transition-transform active:scale-95"
-      >
-        <MessageCircle size={22} />
-      </button>
     </div>
   );
 }
 
 function Section({ title, children, onSeeAll }: { title: string; children: React.ReactNode; onSeeAll?: () => void }) {
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="font-[900] text-xl text-[#1E1E1E] tracking-tight">{title}</h2>
-        {onSeeAll && (
-          <button onClick={onSeeAll} className="text-xs font-black text-[#FF6A00] flex items-center bg-[#fff1e6] px-3 py-1.5 rounded-xl transition-transform active:scale-95">
-            See all <ChevronRight size={14} className="ml-0.5" />
-          </button>
-        )}
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-bold text-base">{title}</h2>
+        {onSeeAll && <button onClick={onSeeAll} className="text-xs text-orange-500 font-medium flex items-center gap-0.5"><ChevronRight size={12} /></button>}
       </div>
-      <div className="relative">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

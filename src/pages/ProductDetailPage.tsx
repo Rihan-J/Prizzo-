@@ -7,6 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { ProductCard } from '../components/Cards';
 import Toast, { useToast } from '../components/Toast';
 import api from '../services/api';
+import { getProductImage } from '../utils/imageResolver';
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -66,8 +67,8 @@ export default function ProductDetailPage() {
   }
 
   // Derive missing UI fields safely
-  const emoji = product.emoji || '📦';
-  const brand = product.brand || 'Local Brand';
+  const imageUrl = product.imageUrl || getProductImage(product.name, product.category);
+  const brand = product.brand || 'Local Store';
   const mrp = product.mrp || product.price; // Backend doesn't have MRP yet
   const discount = product.discount || 0;
   const rating = product.rating || 4.5;
@@ -99,8 +100,11 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Product Image */}
-      <div className="bg-gray-50 h-56 flex items-center justify-center">
-        <motion.span initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="text-8xl">{emoji}</motion.span>
+      <div className="bg-white h-72 flex items-center justify-center p-8 relative overflow-hidden">
+        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full relative z-10">
+          <img src={imageUrl} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" />
+        </motion.div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50/50" />
       </div>
 
       <div className="px-4 mt-4 space-y-4">
