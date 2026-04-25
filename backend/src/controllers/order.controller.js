@@ -5,6 +5,8 @@ const { commissionPercentage } = require("../config/platform");
 const { sendSuccess, sendError, paginationMeta } = require("../utils/response");
 const { throttledEmit } = require("../config/socket");
 const { enqueueNotification } = require("../services/queue.service");
+const { searchNearbyProducts } = require("../services/nearby.service");
+const { getNearbyRecommendationSummary, deterministicNearbySummary } = require("../services/ai.service");
 
 // ─── POST /orders — Checkout / Create Order (strong consistency) ───
 const checkout = async (req, res) => {
@@ -14,12 +16,18 @@ const checkout = async (req, res) => {
     const cart = await prisma.cart.findUnique({
       where: { userId },
       include: {
-        items: { include: { product: true } },
+        items: {
+          where: { isSelected: true },
+          include: { product: true },
+        },
       },
     });
 
-    if (!cart || cart.items.length === 0) {
+    if (!cart) {
       return sendError(res, 400, "Cart is empty.");
+    }
+    if (cart.items.length === 0) {
+      return sendError(res, 400, "Select at least one item to checkout.");
     }
     if (!cart.storeId) {
       return sendError(res, 400, "Cart has no store context.");
@@ -83,9 +91,17 @@ const checkout = async (req, res) => {
         include: { items: true },
       });
 
-      // Clear the Cart
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-      await tx.cart.update({ where: { id: cart.id }, data: { storeId: null } });
+      await tx.cartItem.deleteMany({
+        where: {
+          cartId: cart.id,
+          id: { in: cart.items.map((item) => item.id) },
+        },
+      });
+
+      const remainingItems = await tx.cartItem.count({ where: { cartId: cart.id } });
+      if (remainingItems === 0) {
+        await tx.cart.update({ where: { id: cart.id }, data: { storeId: null } });
+      }
 
       return newOrder;
     }, {
@@ -277,9 +293,224 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+const ALLOWED_SMART_RADII = new Set([1, 2, 3, 5]);
+
+// ─── POST /orders/smart — Smart Buy (cheapest nearby store) ───
+const smartOrder = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { productId, quantity, lat, lng, radius: rawRadius } = req.body;
+
+    // ── Input validation ──
+    if (!productId || typeof productId !== "string") {
+      return sendError(res, 400, "productId is required.");
+    }
+
+    const parsedQty = parseInt(quantity, 10);
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0 || parsedQty > 10) {
+      return sendError(res, 400, "quantity must be between 1 and 10.");
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    if (!Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90) {
+      return sendError(res, 400, "lat must be a valid number between -90 and 90.");
+    }
+    if (!Number.isFinite(parsedLng) || parsedLng < -180 || parsedLng > 180) {
+      return sendError(res, 400, "lng must be a valid number between -180 and 180.");
+    }
+
+    const parsedRadius = parseFloat(rawRadius || "3");
+    const radius = ALLOWED_SMART_RADII.has(parsedRadius) ? parsedRadius : 3;
+
+    // ── 1. Fetch the source product (the one the user is viewing) ──
+    const sourceProduct = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, name: true, price: true, stock: true, isAvailable: true, storeId: true },
+    });
+
+    if (!sourceProduct) {
+      return sendError(res, 404, "Product not found.");
+    }
+
+    // ── 2. Search nearby stores for the same product ──
+    const { scored, cheapest, nearest, best } = await searchNearbyProducts({
+      lat: parsedLat,
+      lng: parsedLng,
+      radius,
+      query: sourceProduct.name,
+    });
+
+    // ── 3. Filter candidates with sufficient stock ──
+    const candidates = scored
+      .filter((item) => item.isAvailable && item.stock >= parsedQty)
+      .sort((a, b) => a.price - b.price || a.distance - b.distance);
+
+    if (candidates.length === 0) {
+      return sendError(res, 404, `No nearby stores have "${sourceProduct.name}" in stock within ${radius}km.`);
+    }
+
+    // ── 4. Try to place order — fallback chain for stock races ──
+    let orderData = null;
+    let selectedCandidate = null;
+
+    for (const candidate of candidates) {
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          // Fresh read inside transaction for concurrency safety
+          const freshProduct = await tx.product.findUnique({
+            where: { id: candidate.productId },
+          });
+
+          if (!freshProduct || !freshProduct.isAvailable) {
+            throw new Error("SKIP");
+          }
+          if (freshProduct.stock < parsedQty) {
+            throw new Error("SKIP");
+          }
+
+          const priceAtCheckout = freshProduct.price;
+          const totalAmount = priceAtCheckout * parsedQty;
+
+          // Commission
+          const commission = Math.round((totalAmount * commissionPercentage / 100) * 100) / 100;
+          const vendorEarnings = Math.round((totalAmount - commission) * 100) / 100;
+
+          // Decrement stock atomically
+          const newStock = freshProduct.stock - parsedQty;
+          await tx.product.update({
+            where: { id: freshProduct.id },
+            data: {
+              stock: newStock,
+              isAvailable: newStock > 0,
+            },
+          });
+
+          // Create Order + OrderItem
+          const newOrder = await tx.order.create({
+            data: {
+              userId,
+              storeId: freshProduct.storeId,
+              totalAmount,
+              commission,
+              vendorEarnings,
+              status: "CONFIRMED",
+              items: {
+                create: [{
+                  productId: freshProduct.id,
+                  quantity: parsedQty,
+                  price: priceAtCheckout,
+                }],
+              },
+            },
+            include: { items: true },
+          });
+
+          return newOrder;
+        }, {
+          timeout: 20000,
+          maxWait: 10000,
+        });
+
+        orderData = result;
+        selectedCandidate = candidate;
+        break; // Success — stop trying
+      } catch (txError) {
+        if (txError.message === "SKIP") {
+          // This candidate ran out of stock — try next
+          logger.info({ productId: candidate.productId, storeName: candidate.storeName }, "Smart Buy: candidate skipped (stock)");
+          continue;
+        }
+        throw txError; // Re-throw unexpected errors
+      }
+    }
+
+    if (!orderData || !selectedCandidate) {
+      return sendError(res, 400, `All nearby stores ran out of stock for "${sourceProduct.name}". Please try again.`);
+    }
+
+    // ── 5. Post-transaction: cache invalidation ──
+    await Promise.all([
+      cache.invalidate("products"),
+      cache.invalidate("categories"),
+      cache.invalidate("stores"),
+      cache.invalidate("admin"),
+    ]);
+
+    // ── 6. Real-time: Notify vendor via Socket.IO ──
+    const io = req.app.get("io");
+    if (io) {
+      throttledEmit(io, `vendor:${selectedCandidate.storeId}`, "order:new", {
+        orderId: orderData.id,
+        totalAmount: orderData.totalAmount,
+        itemCount: orderData.items.length,
+        userId,
+      });
+    }
+
+    // ── 7. Enqueue notification job ──
+    enqueueNotification("order-created", {
+      orderId: orderData.id,
+      storeId: selectedCandidate.storeId,
+      userId,
+      totalAmount: orderData.totalAmount,
+      itemCount: orderData.items.length,
+    });
+
+    // ── 8. Calculate savings ──
+    const savings = Math.max(0, Math.round((sourceProduct.price - selectedCandidate.price) * parsedQty * 100) / 100);
+
+    // ── 9. AI summary (non-blocking, with fallback) ──
+    let summary;
+    try {
+      summary = await getNearbyRecommendationSummary({
+        query: sourceProduct.name,
+        radius,
+        lat: parsedLat,
+        lng: parsedLng,
+        results: scored,
+        cheapest,
+        nearest,
+        best,
+      });
+    } catch {
+      summary = deterministicNearbySummary({ cheapest, nearest, best });
+    }
+
+    logger.info({
+      orderId: orderData.id,
+      userId,
+      storeId: selectedCandidate.storeId,
+      storeName: selectedCandidate.storeName,
+      price: selectedCandidate.price,
+      distance: selectedCandidate.distance,
+      savings,
+    }, "Smart Buy order placed");
+
+    return sendSuccess(res, 201, {
+      order: orderData,
+      selectedStore: {
+        name: selectedCandidate.storeName,
+        price: selectedCandidate.price,
+        distance: selectedCandidate.distance,
+        address: selectedCandidate.storeAddress,
+      },
+      savings,
+      summary,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "[SmartOrder Error]");
+    const message = error.message && (error.message.includes("Insufficient") || error.message.includes("unavailable") || error.message.includes("stock"))
+      ? error.message
+      : "Internal server error during Smart Buy.";
+    return sendError(res, 400, message);
+  }
+};
+
 module.exports = {
   checkout,
   getUserOrders,
   getVendorOrders,
   updateOrderStatus,
+  smartOrder,
 };

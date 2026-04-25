@@ -5,8 +5,8 @@ import { ChevronRight, LogOut, Heart, MapPin, CreditCard, ShoppingBag, HelpCircl
 import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
-  { icon: ShoppingBag, label: 'My Orders', path: '/orders' },
-  { icon: Heart, label: 'Wishlist', path: '/wishlist' },
+  { icon: ShoppingBag, label: 'My Orders', path: '/activity?tab=orders' },
+  { icon: Heart, label: 'Wishlist', path: '/activity?tab=wishlist' },
   { icon: MapPin, label: 'Saved Addresses', path: '#' },
   { icon: CreditCard, label: 'Payment Methods', path: '#' },
   { icon: Settings, label: 'Settings', path: '/settings' },

@@ -14,18 +14,19 @@ const methods = [
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const { items, subtotal, totalSavings, fetchCart } = useCart();
+  const { items, selectedItems, selectedSubtotal, totalSavings, fetchCart } = useCart();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [slot, setSlot] = useState(slots[2]);
   const [payment, setPayment] = useState('store');
   const [loading, setLoading] = useState(false);
 
-  const charges = Math.round(subtotal * 0.02);
-  const total = subtotal + charges;
+  const selectedCartItems = items.filter(item => item.isSelected);
+  const charges = Math.round(selectedSubtotal * 0.02);
+  const total = selectedSubtotal + charges;
 
   const handleConfirm = async () => {
-    if (items.length === 0) return alert("Your cart is empty!");
+    if (selectedItems === 0) return alert(items.length === 0 ? "Your cart is empty!" : "Select items to proceed.");
     
     try {
       setLoading(true);
@@ -43,7 +44,7 @@ export default function CheckoutPage() {
             storeName: 'Local Store', 
             pickupTime: slot, 
             total: order.totalAmount, 
-            items: items.length 
+            items: selectedItems
           }, 
           replace: true 
         });
@@ -106,7 +107,12 @@ export default function CheckoutPage() {
         {/* Order Summary */}
         <div className="bg-white rounded-2xl p-4 shadow-card space-y-2">
           <h3 className="text-sm font-semibold mb-2">Order Summary</h3>
-          <div className="flex justify-between text-sm"><span className="text-gray-500">Items ({items.length})</span><span>₹{subtotal}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">Items ({selectedItems})</span><span>₹{selectedSubtotal}</span></div>
+          {selectedCartItems.length > 0 && (
+            <div className="text-xs text-gray-400">
+              {selectedCartItems.map(item => `${item.name} x${item.qty}`).join(' • ')}
+            </div>
+          )}
           <div className="flex justify-between text-sm"><span className="text-gray-500">Platform Fee</span><span>₹{charges}</span></div>
           {totalSavings > 0 && <div className="flex justify-between text-sm"><span className="text-green-600">Savings</span><span className="text-green-600">-₹{totalSavings}</span></div>}
           <div className="border-t border-gray-100 pt-2 flex justify-between font-bold"><span>Total</span><span className="text-orange-600">₹{total}</span></div>
@@ -114,9 +120,9 @@ export default function CheckoutPage() {
       </div>
 
       <div className="fixed left-0 right-0 z-40 bg-white border-t border-gray-100 px-4 pt-3 pb-4" style={{ bottom: '80px' }}>
-        <button onClick={handleConfirm} disabled={loading || items.length === 0}
+        <button onClick={handleConfirm} disabled={loading || selectedItems === 0}
           className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-2xl font-semibold shadow-orange text-base flex justify-center items-center gap-2 disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none">
-          {loading ? <Loader2 size={20} className="animate-spin" /> : `Confirm Order — ₹${total}`}
+          {loading ? <Loader2 size={20} className="animate-spin" /> : selectedItems > 0 ? `Confirm Order — ₹${total}` : 'Select items to proceed'}
         </button>
       </div>
     </div>

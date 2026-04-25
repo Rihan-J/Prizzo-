@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bell, Loader2 } from 'lucide-react';
+import { NotificationsSkeleton } from '../components/Skeleton';
 import { motion } from 'framer-motion';
 import api from '../services/api';
 
@@ -56,10 +57,7 @@ export default function NotificationsPage() {
       </div>
       <div className="px-4 mt-4 space-y-2">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
-            <Loader2 size={32} className="animate-spin text-orange-400" />
-            <p className="text-sm">Loading notifications…</p>
-          </div>
+          <NotificationsSkeleton />
         ) : error ? (
           <div className="text-center py-16">
             <span className="text-5xl">⚠️</span>

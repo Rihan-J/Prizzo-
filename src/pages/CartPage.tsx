@@ -4,15 +4,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Minus, Plus, Trash2, Tag, ShoppingBag, Clock } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
-export default function CartPage() {
+export default function CartPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
-  const { items, updateQty, removeItem, clearCart, subtotal, totalSavings, totalItems } = useCart();
+  const { items, updateQty, removeItem, selectItem, clearCart, selectedSubtotal, selectedItems, totalSavings, totalItems } = useCart();
   const [coupon, setCoupon] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
 
-  const charges = Math.round(subtotal * 0.02);
-  const discount = couponApplied ? Math.round(subtotal * 0.1) : 0;
-  const total = subtotal + charges - discount;
+  const charges = Math.round(selectedSubtotal * 0.02);
+  const discount = couponApplied ? Math.round(selectedSubtotal * 0.1) : 0;
+  const total = selectedSubtotal + charges - discount;
+  const allSelected = items.length > 0 && items.every(item => item.isSelected);
+
+  const toggleSelectAll = async () => {
+    const nextSelected = !allSelected;
+    await Promise.all(items.map(item => selectItem(item.id, nextSelected)));
+  };
 
   // Group by store
   const grouped = items.reduce((acc, item) => {
@@ -23,7 +29,7 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-8 pb-24">
+      <div className={`${embedded ? 'min-h-[55vh]' : 'min-h-dvh'} flex flex-col items-center justify-center px-8 pb-24`}>
         <motion.span initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="text-7xl">🛒</motion.span>
         <h2 className="text-xl font-bold mt-6">Your cart is empty</h2>
         <p className="text-gray-400 text-sm mt-2 text-center">
@@ -41,10 +47,10 @@ export default function CartPage() {
 
   // Checkout bar height ~88px + bottom nav ~80px + 8px gap = 176px → pb-44 (176px)
   return (
-    <div className="min-h-dvh bg-gray-50">
+    <div className={embedded ? "bg-gray-50" : "min-h-dvh bg-gray-50"}>
 
       {/* ── Sticky Header ── */}
-      <div className="sticky top-0 z-30 bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100">
+      {!embedded && <div className="sticky top-0 z-30 bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-1">
             <ArrowLeft size={20} />
@@ -54,11 +60,23 @@ export default function CartPage() {
         <button onClick={clearCart} className="text-xs text-red-400 font-medium px-2 py-1">
           Clear All
         </button>
-      </div>
+      </div>}
 
       {/* ── Scrollable body ──
           pb = checkout bar (~88px) + bottom nav (80px) + breathing room (16px) = 184px ≈ pb-48 */}
       <div className="px-4 pt-4 pb-48 space-y-4">
+        <div className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center justify-between">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="h-5 w-5 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+            />
+            <span className="text-sm font-semibold">Select All</span>
+          </label>
+          <span className="text-xs text-gray-400">{selectedItems} selected</span>
+        </div>
 
         {/* Store groups */}
         {Object.entries(grouped).map(([storeId, group]) => (
@@ -80,6 +98,12 @@ export default function CartPage() {
                   className="px-4 py-3 border-b border-gray-50 last:border-0"
                 >
                   <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={item.isSelected}
+                      onChange={(e) => selectItem(item.id, e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-gray-300 text-orange-500 focus:ring-orange-400 flex-shrink-0"
+                    />
                     <span className="text-2xl flex-shrink-0 mt-0.5">{item.emoji}</span>
 
                     <div className="flex-1 min-w-0">
@@ -151,7 +175,7 @@ export default function CartPage() {
           <h3 className="text-sm font-semibold">Order Summary</h3>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Subtotal</span>
-            <span className="font-medium">₹{subtotal}</span>
+            <span className="font-medium">₹{selectedSubtotal}</span>
           </div>
           {totalSavings > 0 && (
             <div className="flex justify-between text-sm">
@@ -195,10 +219,11 @@ export default function CartPage() {
           </div>
           <button
             onClick={() => navigate('/checkout')}
-            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-transform"
+            disabled={selectedItems === 0}
+            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-transform disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none disabled:text-gray-500"
           >
             <ShoppingBag size={18} />
-            Proceed to Checkout
+            {selectedItems > 0 ? `Checkout (${selectedItems} item${selectedItems > 1 ? 's' : ''})` : 'Select items to proceed'}
           </button>
         </div>
       </div>

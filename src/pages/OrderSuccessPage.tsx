@@ -32,7 +32,7 @@ export default function OrderSuccessPage() {
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}
         className="flex gap-3 mt-8 w-full">
-        <button onClick={() => navigate('/orders')}
+        <button onClick={() => navigate('/activity?tab=orders')}
           className="flex-1 bg-orange-500 text-white py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2">
           <ShoppingBag size={18} /> Track Order
         </button>

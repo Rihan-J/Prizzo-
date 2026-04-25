@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Heart, Star, Clock, MapPin, Share2, ShoppingCart, ChevronRight, BarChart3, Loader2 } from 'lucide-react';
+import { ArrowLeft, Heart, Star, Clock, MapPin, Share2, ShoppingCart, ChevronRight, BarChart3, Loader2, Zap, MapPinOff } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { ProductCard } from '../components/Cards';
-import Toast, { useToast } from '../components/Toast';
+import { useToast } from '../components/Toast';
+import { ProductDetailSkeleton } from '../components/Skeleton';
 import api from '../services/api';
 import { getProductImage } from '../utils/imageResolver';
 
@@ -19,6 +20,31 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null);
   const [similar, setSimilar] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ── Smart Buy state ──
+  const [smartBuyLoading, setSmartBuyLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // ── Request geolocation on mount ──
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation not supported');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocationError(null);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err.message);
+        setLocationError(err.code === 1 ? 'Location access denied' : 'Location unavailable');
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  }, []);
 
   useEffect(() => {
     const fetchProductDetails = async () => {
@@ -50,12 +76,7 @@ export default function ProductDetailPage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center bg-white text-gray-500 gap-3">
-        <Loader2 className="animate-spin text-orange-500" size={32} />
-        <p>Loading product...</p>
-      </div>
-    );
+    return <ProductDetailSkeleton />;
   }
 
   if (!product) {
@@ -79,15 +100,60 @@ export default function ProductDetailPage() {
 
   // TODO: Implement real reviews via GET /products/:id/reviews when backend is ready
 
-  const handleAdd = () => {
-    addItem(product.id, 1, product);
-    toast.show('Added to cart!', 'success');
+  const handleAdd = async () => {
+    const added = await addItem(product.id, 1, product);
+    if (added) toast.show(`${product.name} added successfully`, 'success');
   };
 
-  return (
-    <div className="min-h-dvh bg-white pb-32">
-      <Toast message={toast.message} visible={toast.visible} onClose={toast.hide} type={toast.type} />
+  const handleSmartBuy = async () => {
+    if (!userLocation) {
+      toast.show('Enable location access to use Smart Buy', 'error');
+      return;
+    }
 
+    try {
+      setSmartBuyLoading(true);
+      const res = await api.post('/orders/smart', {
+        productId: product.id,
+        quantity: 1,
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+      });
+
+      const data = res.data?.data || res.data;
+      if (data?.order) {
+        const order = data.order;
+        const store = data.selectedStore;
+        const savings = data.savings || 0;
+
+        const toastMsg = savings > 0
+          ? `Bought from ${store.name} — saved ₹${savings}! 🎉`
+          : `Order placed at ${store.name} (${store.distance}km away) ⚡`;
+        toast.show(toastMsg, 'success');
+
+        navigate('/order-success', {
+          state: {
+            orderId: order.id.slice(0, 8).toUpperCase(),
+            storeName: store.name,
+            pickupTime: `~${pickupEta} min`,
+            total: order.totalAmount,
+            items: 1,
+          },
+          replace: true,
+        });
+      }
+    } catch (error: any) {
+      const errMsg = error.response?.data?.error || 'Smart Buy failed. Try again.';
+      toast.show(errMsg, 'error');
+    } finally {
+      setSmartBuyLoading(false);
+    }
+  };
+
+  const smartBuyDisabled = !inStock || !userLocation || smartBuyLoading;
+
+  return (
+    <div className="min-h-dvh bg-white pb-40">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-gray-50">
         <button onClick={() => navigate(-1)} className="p-1"><ArrowLeft size={20} /></button>
@@ -192,11 +258,26 @@ export default function ProductDetailPage() {
         )}
       </div>
 
-      {/* Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-100 px-4 py-3 flex gap-3 z-40">
+      {/* Bottom CTA — Dual Button Layout */}
+      <div className="fixed left-0 right-0 w-full bg-white border-t border-gray-100 px-4 py-3 flex gap-3 z-40" style={{ bottom: '60px' }}>
+        {/* Add to Cart (secondary) */}
         <button onClick={handleAdd} disabled={!inStock}
-          className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-orange disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none">
+          className="flex-1 bg-white border-2 border-orange-500 text-orange-600 py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:border-gray-300 disabled:text-gray-300 transition-colors active:bg-orange-50"
+          id="add-to-cart-btn">
           <ShoppingCart size={18} /> Add to Cart
+        </button>
+
+        {/* Smart Buy (primary) */}
+        <button onClick={handleSmartBuy} disabled={smartBuyDisabled}
+          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 shadow-lg disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none transition-all active:scale-[0.98]"
+          id="smart-buy-btn">
+          {smartBuyLoading ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : !userLocation ? (
+            <><MapPinOff size={16} /> Enable Location</>
+          ) : (
+            <><Zap size={18} /> Smart Buy</>
+          )}
         </button>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, MapPin, Clock, Award, Zap, DollarSign, Loader2, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../services/api';
+import { CompareSkeleton } from '../components/Skeleton';
 
 const badgeConfig = {
   cheapest: { label: 'Cheapest', color: 'bg-green-100 text-green-700', icon: DollarSign },
@@ -101,10 +102,7 @@ export default function ComparePage() {
         </div>
 
         {loading && comparisons.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
-             <Loader2 size={32} className="animate-spin text-orange-400" />
-             <p className="text-sm font-medium">Scanning local stores...</p>
-          </div>
+          <CompareSkeleton />
         ) : comparisons.length === 0 ? (
           <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 text-gray-400 p-6 shadow-sm">
              <span className="text-4xl">🏷️</span>

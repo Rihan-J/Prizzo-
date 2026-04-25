@@ -2,6 +2,73 @@ const prisma = require("../config/db");
 const cache = require("../utils/cache");
 const logger = require("../utils/logger");
 const { sendSuccess, sendError, paginationMeta } = require("../utils/response");
+const { getNearbyRecommendationSummary } = require("../services/ai.service");
+const { searchNearbyProducts, sortResults } = require("../services/nearby.service");
+
+const ALLOWED_RADII_KM = new Set([1, 2, 3, 5]);
+const ALLOWED_NEARBY_SORTS = new Set(["best", "cheapest", "nearest"]);
+const MAX_NEARBY_LIMIT = 50;
+
+function parseNearbyQuery(reqQuery) {
+  const lat = parseFloat(reqQuery.lat);
+  const lng = parseFloat(reqQuery.lng);
+  const requestedRadius = parseFloat(reqQuery.radius || "3");
+  const radius = ALLOWED_RADII_KM.has(requestedRadius) ? requestedRadius : 3;
+  const query = typeof reqQuery.query === "string" ? reqQuery.query.trim() : "";
+  const sort = ALLOWED_NEARBY_SORTS.has(reqQuery.sort) ? reqQuery.sort : "best";
+  const page = Math.max(1, parseInt(reqQuery.page, 10) || 1);
+  const limit = Math.min(MAX_NEARBY_LIMIT, Math.max(1, parseInt(reqQuery.limit, 10) || 20));
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    return { error: "lat must be a valid number between -90 and 90." };
+  }
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+    return { error: "lng must be a valid number between -180 and 180." };
+  }
+  if (!query || query.length < 2) {
+    return { error: "query must be at least 2 characters." };
+  }
+
+  return { lat, lng, radius, query, sort, page, limit };
+}
+
+const getNearbyProducts = async (req, res) => {
+  try {
+    const parsed = parseNearbyQuery(req.query);
+    if (parsed.error) return sendError(res, 400, parsed.error);
+
+    const { lat, lng, radius, query, sort, page, limit } = parsed;
+    const skip = (page - 1) * limit;
+
+    // ── Delegate to shared service ──
+    const { scored, cheapest, nearest, best } = await searchNearbyProducts({ lat, lng, radius, query });
+    const sorted = sortResults(scored, sort);
+
+    const summary = await getNearbyRecommendationSummary({
+      query,
+      radius,
+      lat,
+      lng,
+      results: sorted,
+      cheapest,
+      nearest,
+      best,
+    });
+
+    return sendSuccess(res, 200, {
+      results: sorted.slice(skip, skip + limit),
+      recommendation: {
+        cheapestProductId: cheapest?.productId || null,
+        nearestProductId: nearest?.productId || null,
+        bestProductId: best?.productId || null,
+        summary,
+      },
+    }, paginationMeta(page, limit, sorted.length));
+  } catch (error) {
+    logger.error({ err: error }, "[GetNearbyProducts Error]");
+    return sendError(res, 500, "Internal server error.");
+  }
+};
 
 // ─── GET /products — List All Products (with search & filter + server cache) ───
 const getAllProducts = async (req, res) => {
@@ -140,4 +207,4 @@ const getCategories = async (req, res) => {
   }
 };
 
-module.exports = { getAllProducts, getProductById, getCategories };
+module.exports = { getAllProducts, getNearbyProducts, getProductById, getCategories };

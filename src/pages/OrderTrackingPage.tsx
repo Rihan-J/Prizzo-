@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Phone, Loader2, CheckCircle, Package, Receipt, ChefHat, AlertCircle, Star, Info, Sparkles } from 'lucide-react';
+import { OrderTrackingSkeleton } from '../components/Skeleton';
 import api from '../services/api';
 const GlobalStyles = () => (
   <style>{`
@@ -68,12 +69,7 @@ export default function OrderTrackingPage() {
     return () => clearInterval(interval);
   }, [preparationTips.length]);
   if (loading) {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-3 text-gray-500">
-        <Loader2 size={32} className="animate-spin text-orange-500" />
-        <p>Loading order details...</p>
-      </div>
-    );
+    return <OrderTrackingSkeleton />;
   }
 
   if (fetchError) {
@@ -92,7 +88,7 @@ export default function OrderTrackingPage() {
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4">
         <AlertCircle size={48} className="text-gray-300" />
         <p className="text-gray-500">Order not found</p>
-        <button onClick={() => navigate('/orders')} className="bg-orange-50 text-orange-600 px-6 py-2 rounded-xl font-medium">Go Back</button>
+        <button onClick={() => navigate('/activity?tab=orders')} className="bg-orange-50 text-orange-600 px-6 py-2 rounded-xl font-medium">Go Back</button>
       </div>
     );
   }
@@ -105,7 +101,7 @@ export default function OrderTrackingPage() {
         <h1 className="text-2xl font-black text-gray-900 leading-tight">Order Cancelled</h1>
         <p className="text-gray-500 text-sm max-w-xs mx-auto">This order was cancelled. If you have any questions, please contact our support team.</p>
         <div className="flex flex-col w-full gap-3 mt-4">
-           <button onClick={() => navigate('/orders')} className="w-full bg-gray-900 text-white px-8 py-3.5 rounded-2xl font-bold active:scale-95 transition-all shadow-lg">Back to Orders</button>
+           <button onClick={() => navigate('/activity?tab=orders')} className="w-full bg-gray-900 text-white px-8 py-3.5 rounded-2xl font-bold active:scale-95 transition-all shadow-lg">Back to Orders</button>
            <button className="w-full text-gray-500 font-bold py-2">Contact Support</button>
         </div>
       </div>
@@ -127,7 +123,7 @@ export default function OrderTrackingPage() {
       <div className="fixed top-0 inset-x-0 z-40 flex justify-center pointer-events-none p-2 md:p-0">
         <div className="w-full max-w-3xl bg-white/90 backdrop-blur-lg border border-gray-100 rounded-2xl md:rounded-none md:border-x-0 md:border-t-0 flex items-center justify-between px-3 md:px-6 py-2 md:py-4 pointer-events-auto shadow-sm">
           <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-            <button onClick={() => navigate('/orders')} className="min-w-[40px] w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:scale-90 transition-all rounded-xl">
+            <button onClick={() => navigate('/activity?tab=orders')} className="min-w-[40px] w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:scale-90 transition-all rounded-xl">
               <ArrowLeft size={20} />
             </button>
             <div className="min-w-0 flex-1">

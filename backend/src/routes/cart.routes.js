@@ -7,6 +7,7 @@ const {
   addToCart,
   getCart,
   updateCartItem,
+  selectCartItem,
   removeCartItem,
   clearCart,
 } = require("../controllers/cart.controller");
@@ -17,6 +18,7 @@ router.use(authorize("USER"));
 
 router.get("/", getCart);
 router.post("/add", addToCart);
+router.patch("/item/:id/select", selectCartItem);
 router.patch("/item/:id", updateCartItem);
 router.delete("/item/:id", removeCartItem);
 router.delete("/clear", clearCart);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
@@ -12,7 +12,7 @@ interface ToastProps {
 export default function Toast({ message, visible, onClose, type = 'success' }: ToastProps) {
   const colors = { success: 'bg-green-600', error: 'bg-red-500', info: 'bg-blue-500' };
   React.useEffect(() => {
-    if (visible) { const t = setTimeout(onClose, 2500); return () => clearTimeout(t); }
+    if (visible) { const t = setTimeout(onClose, 2000); return () => clearTimeout(t); }
   }, [visible, onClose]);
   return (
     <AnimatePresence>
@@ -27,9 +27,32 @@ export default function Toast({ message, visible, onClose, type = 'success' }: T
   );
 }
 
+type ToastType = 'success' | 'error' | 'info';
+type ToastContextValue = {
+  visible: boolean;
+  message: string;
+  type: ToastType;
+  show: (message: string, type?: ToastType) => void;
+  hide: () => void;
+};
+
+const ToastContext = createContext<ToastContextValue | null>(null);
+
 export function useToast() {
-  const [state, setState] = React.useState({ visible: false, message: '', type: 'success' as 'success' | 'error' | 'info' });
-  const show = (message: string, type: 'success' | 'error' | 'info' = 'success') => setState({ visible: true, message, type });
+  const context = useContext(ToastContext);
+  if (!context) throw new Error('useToast must be used within ToastProvider');
+  return context;
+}
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = React.useState({ visible: false, message: '', type: 'success' as ToastType });
+  const show = (message: string, type: ToastType = 'success') => setState({ visible: true, message, type });
   const hide = () => setState(s => ({ ...s, visible: false }));
-  return { ...state, show, hide };
+
+  return (
+    <ToastContext.Provider value={{ ...state, show, hide }}>
+      {children}
+      <Toast message={state.message} visible={state.visible} onClose={hide} type={state.type} />
+    </ToastContext.Provider>
+  );
 }

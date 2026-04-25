@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { WishlistSkeleton } from '../components/Skeleton';
 import { useWishlist } from '../context/WishlistContext';
 import { ProductCard } from '../components/Cards';
 import { motion } from 'framer-motion';
 import api from '../services/api';
 
-export default function WishlistPage() {
+export default function WishlistPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { ids } = useWishlist();
   const [wished, setWished] = useState<any[]>([]);
@@ -21,8 +22,6 @@ export default function WishlistPage() {
           return;
         }
 
-        // For demo purposes, we fetch latest products and filter
-        // A real app would send ids[] to the backend
         const res = await api.get('/products?limit=100');
         const responseData = res.data?.data || res.data;
         if (responseData?.products) {
@@ -38,16 +37,14 @@ export default function WishlistPage() {
   }, [ids]);
 
   return (
-    <div className="min-h-dvh bg-gray-50 pb-nav">
-      <div className="sticky top-0 z-30 bg-white px-4 py-3 flex items-center gap-3 border-b border-gray-100">
+    <div className={embedded ? "bg-gray-50 pb-4" : "min-h-dvh bg-gray-50 pb-nav"}>
+      {!embedded && <div className="sticky top-0 z-30 bg-white px-4 py-3 flex items-center gap-3 border-b border-gray-100">
         <button onClick={() => navigate(-1)}><ArrowLeft size={20} /></button>
         <h1 className="font-bold text-lg">Wishlist {!loading && `(${wished.length})`}</h1>
-      </div>
+      </div>}
       <div className="px-4 mt-4 space-y-3">
         {loading ? (
-           <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
-             <Loader2 size={32} className="animate-spin text-orange-400" />
-           </div>
+           <WishlistSkeleton />
         ) : (
           <>
             {wished.map(p => <ProductCard key={p.id} product={p} />)}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, CheckCircle, Package, Ban, Loader2 } from 'lucide-react';
+import { OrdersSkeleton } from '../components/Skeleton';
 import api from '../services/api';
 import { useOrderUpdates } from '../hooks/useSocket';
 
@@ -30,7 +31,7 @@ interface Order {
   createdAt: string;
 }
 
-export default function OrdersPage() {
+export default function OrdersPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState('All');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -85,12 +86,14 @@ export default function OrdersPage() {
   });
 
   return (
-    <div className="min-h-dvh bg-gray-50 pb-nav">
-      <div className="sticky top-0 z-30 bg-white px-4 pt-3 pb-0 border-b border-gray-100">
+    <div className={embedded ? "bg-gray-50 pb-4" : "min-h-dvh bg-gray-50 pb-nav"}>
+      <div className={`${embedded ? 'bg-gray-50' : 'sticky top-0 z-30 bg-white border-b border-gray-100'} px-4 pt-3 pb-0`}>
+        {!embedded && (
         <div className="flex items-center gap-3 mb-3">
           <button onClick={() => navigate(-1)}><ArrowLeft size={20} /></button>
           <h1 className="font-bold text-lg">My Orders</h1>
         </div>
+        )}
         <div className="flex gap-2 pb-3 overflow-x-auto no-scrollbar">
           {filterTabs.map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -103,9 +106,7 @@ export default function OrdersPage() {
 
       <div className="px-4 mt-4 space-y-3">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
-             <Loader2 size={32} className="animate-spin text-orange-400" />
-          </div>
+          <OrdersSkeleton />
         ) : (
           <>
             {filteredOrders.map((order: Order) => {

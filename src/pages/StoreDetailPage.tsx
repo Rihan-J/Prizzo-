@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Star, Clock, MapPin, Phone, Search, X, Navigation, Loader2, ExternalLink } from 'lucide-react';
 import { ProductCard } from '../components/Cards';
+import { StoreDetailSkeleton } from '../components/Skeleton';
 import api from '../services/api';
 
 // ─── Map Modal ────────────────────────────────────────────────────────────────
@@ -293,12 +294,7 @@ export default function StoreDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center text-gray-500 gap-3">
-        <Loader2 className="animate-spin text-orange-500" size={32} />
-        <p>Loading store...</p>
-      </div>
-    );
+    return <StoreDetailSkeleton />;
   }
 
   if (!store) return (

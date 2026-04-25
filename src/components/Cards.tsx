@@ -4,16 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, MapPin, Clock, Star, ChevronRight, ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useToast } from './Toast';
 import { getProductImage } from '../utils/imageResolver';
 
 export function ProductCard({ product, compact }: { product: any; compact?: boolean }) {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { toggle, isWished } = useWishlist();
+  const toast = useToast();
 
-  const handleAdd = (e: React.MouseEvent) => {
+  const handleAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    addItem(product.id, 1, product);
+    const added = await addItem(product.id, 1, product);
+    if (added) toast.show(`${product.name} added successfully`, 'success');
   };
 
   const imageUrl = product.imageUrl || getProductImage(product.name, product.category);

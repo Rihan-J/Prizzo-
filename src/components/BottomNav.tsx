@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Search, ShoppingBag, Heart, User } from 'lucide-react';
+import { Home, Search, LayoutList, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,8 +9,7 @@ import { useLanguage } from '../context/LanguageContext';
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/search', icon: Search, label: 'Search' },
-  { to: '/orders', icon: ShoppingBag, label: 'Orders' },
-  { to: '/wishlist', icon: Heart, label: 'Wishlist' },
+  { to: '/activity', icon: LayoutList, label: 'Activity' },
   { to: '/profile', icon: User, label: 'Profile' },
 ];
 
@@ -33,7 +32,7 @@ export default function BottomNav() {
             <NavLink key={to} to={to} className="relative flex flex-col items-center gap-0.5 px-3 py-1">
               <div className="relative">
                 <Icon size={22} className={isActive ? 'text-orange-500' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 1.8} />
-                {label === 'Orders' && totalItems > 0 && (
+                {label === 'Activity' && totalItems > 0 && (
                   <span className="absolute -top-1.5 -right-2 bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{totalItems}</span>
                 )}
               </div>

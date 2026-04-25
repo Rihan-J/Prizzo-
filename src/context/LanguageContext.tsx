@@ -13,6 +13,8 @@ const translations: Record<Language, Record<string, string>> = {
     // BottomNav
     Home: 'Home',
     Search: 'Search',
+    Cart: 'Cart',
+    Activity: 'Activity',
     Orders: 'Orders',
     Wishlist: 'Wishlist',
     Profile: 'Profile',

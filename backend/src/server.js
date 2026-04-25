@@ -25,6 +25,7 @@ const cartRoutes = require("./routes/cart.routes");
 const orderRoutes = require("./routes/order.routes");
 const storeRoutes = require("./routes/store.routes");
 const adminRoutes = require("./routes/admin.routes");
+const aiRoutes = require("./routes/ai.routes");
 
 // ─── Initialize Express ───
 const app = express();
@@ -122,6 +123,7 @@ app.use("/cart", cartRoutes);
 app.use("/orders", orderRoutes);
 app.use("/stores", storeRoutes);
 app.use("/admin", adminLimiter, adminRoutes);
+app.use("/ai", aiRoutes);
 
 // ─── 404 Handler ───
 app.use((req, res) => {

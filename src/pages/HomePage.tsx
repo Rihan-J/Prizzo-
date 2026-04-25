@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, Mic, Bell, ChevronRight, Sparkles, Globe, Check, X, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Search, MapPin, Mic, Bell, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryList } from '../config/categoryConfig';
@@ -29,12 +29,11 @@ const AI_SUGGESTIONS = [
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, isVendor } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   
   const [bannerIdx, setBannerIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [userLocation, setUserLocation] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
 
@@ -88,16 +87,6 @@ export default function HomePage() {
     );
   }, []);
 
-  const languages = [
-    { id: 'English', label: 'English' },
-    { id: 'Hindi', label: 'हिन्दी (Hindi)' },
-    { id: 'Kannada', label: 'ಕನ್ನಡ (Kannada)' },
-  ] as const;
-
-  const selectLanguage = (id: 'English' | 'Hindi' | 'Kannada') => {
-    setLanguage(id);
-    setShowLanguageModal(false);
-  };
 
   useEffect(() => { const t = setInterval(() => setBannerIdx(i => (i + 1) % BANNERS.length), 4000); return () => clearInterval(t); }, []);
 
@@ -161,9 +150,6 @@ export default function HomePage() {
             <h1 className="text-white font-bold text-lg">{user?.name || t('Guest')}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowLanguageModal(true)} className="bg-white/15 text-white p-2 rounded-xl backdrop-blur-sm flex items-center justify-center">
-              <Globe size={18} className="text-white" />
-            </button>
             <button onClick={() => navigate('/notifications')} className="relative bg-white/15 p-2 rounded-xl backdrop-blur-sm">
               <Bell size={18} className="text-white" />
             </button>
@@ -271,50 +257,6 @@ export default function HomePage() {
 
         <div className="h-4" />
       </div>
-
-      {/* Language Selection Bottom Sheet */}
-      <AnimatePresence>
-        {showLanguageModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowLanguageModal(false)}
-              className="fixed inset-0 bg-black/40 z-40"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed bottom-0 left-0 right-0 mx-auto bg-white rounded-t-3xl z-50 p-6 pb-8 max-w-lg"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-lg">{t('Select Language')}</h3>
-                <button onClick={() => setShowLanguageModal(false)} className="p-2 bg-gray-100 rounded-full">
-                  <X size={20} className="text-gray-600" />
-                </button>
-              </div>
-              <div className="space-y-3">
-                {languages.map((l) => (
-                  <button
-                    key={l.id}
-                    onClick={() => selectLanguage(l.id)}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-colors ${language === l.id ? 'border-orange-500 bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'
-                      }`}
-                  >
-                    <span className={`font-semibold ${language === l.id ? 'text-orange-600' : 'text-gray-800'}`}>
-                      {l.label}
-                    </span>
-                    {language === l.id && <Check size={20} className="text-orange-500" />}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -69,6 +69,7 @@ model Store {
   carts    Cart[]
   orders   Order[]
 
+  @@index([latitude, longitude])
   @@map("stores")
 }
 
@@ -96,6 +97,7 @@ model Product {
   @@index([name])
   @@index([storeId])
   @@index([storeId, isAvailable, createdAt])
+  @@index([storeId, isAvailable, stock])
   @@map("products")
 }
 
@@ -118,6 +120,7 @@ model Cart {
 model CartItem {
   id        String   @id @default(uuid())
   quantity  Int
+  isSelected Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

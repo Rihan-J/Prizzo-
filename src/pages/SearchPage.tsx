@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowLeft, X, SlidersHorizontal, TrendingUp, Mic } from 'lucide-react';
 import { getCategoryList, getCategoryDisplay } from '../config/categoryConfig';
 import { ProductCard, StoreCard } from '../components/Cards';
+import { SearchResultsSkeleton } from '../components/Skeleton';
 import api, { createCancelableRequest } from '../services/api';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -209,14 +210,7 @@ export default function SearchPage() {
 
       <div className="px-4 mt-4">
         {apiLoading ? (
-          <div className="flex flex-col items-center gap-3 justify-center py-10">
-            {/* Skeleton loaders */}
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="w-full animate-pulse">
-                <div className="bg-gray-200 h-24 rounded-2xl w-full" />
-              </div>
-            ))}
-          </div>
+          <SearchResultsSkeleton />
         ) : (
           <>
             {!hasResults && (

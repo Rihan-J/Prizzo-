@@ -140,6 +140,39 @@ const updateCartItem = async (req, res) => {
 };
 
 // ─── DELETE /cart/item/:id — Remove Item (returns updated cart) ───
+const selectCartItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isSelected } = req.body;
+    const userId = req.user.userId;
+
+    if (typeof isSelected !== "boolean") {
+      return sendError(res, 400, "isSelected must be a boolean.");
+    }
+
+    const cart = await prisma.cart.findUnique({ where: { userId } });
+    if (!cart) {
+      return sendError(res, 404, "Cart not found.");
+    }
+
+    const cartItem = await prisma.cartItem.findUnique({ where: { id } });
+    if (!cartItem || cartItem.cartId !== cart.id) {
+      return sendError(res, 404, "Cart item not found.");
+    }
+
+    await prisma.cartItem.update({
+      where: { id },
+      data: { isSelected },
+    });
+
+    const updatedCart = await getCartData(userId);
+    return sendSuccess(res, 200, { cart: updatedCart });
+  } catch (error) {
+    logger.error({ err: error }, "[SelectCartItem Error]");
+    return sendError(res, 500, "Internal server error.");
+  }
+};
+
 const removeCartItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -189,7 +222,7 @@ const clearCart = async (req, res) => {
     ]);
 
     logger.info({ userId }, "Cart cleared");
-    return sendSuccess(res, 200, { cart: { items: [], total: 0, storeId: null } });
+    return sendSuccess(res, 200, { cart: { items: [], total: 0, selectedTotal: 0, selectedCount: 0, storeId: null } });
   } catch (error) {
     logger.error({ err: error }, "[ClearCart Error]");
     return sendError(res, 500, "Internal server error.");
@@ -216,14 +249,19 @@ async function getCartData(userId) {
   });
 
   if (!cart) {
-    return { items: [], total: 0, storeId: null };
+    return { items: [], total: 0, selectedTotal: 0, selectedCount: 0, storeId: null };
   }
 
   const total = cart.items.reduce((sum, item) => sum + (item.quantity * item.product.price), 0);
+  const selectedItems = cart.items.filter((item) => item.isSelected);
+  const selectedTotal = selectedItems.reduce((sum, item) => sum + (item.quantity * item.product.price), 0);
+  const selectedCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return {
     ...cart,
     total,
+    selectedTotal,
+    selectedCount,
   };
 }
 
@@ -231,6 +269,7 @@ module.exports = {
   addToCart,
   getCart,
   updateCartItem,
+  selectCartItem,
   removeCartItem,
   clearCart,
 };
