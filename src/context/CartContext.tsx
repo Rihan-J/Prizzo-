@@ -82,13 +82,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       isSelected: item.isSelected ?? true,
       storeId: cartData.storeId || undefined,
       storeName: cartData.store?.name,
+      pickupEta: 15, // Default pickup time
     })) || [];
 
     setItems(normalizedItems);
     setSubtotal(cartData.total || 0);
-    setSelectedSubtotal(cartData.selectedTotal ?? normalizedItems.filter(i => i.isSelected).reduce((acc, curr) => acc + curr.price * curr.qty, 0));
+    setSelectedSubtotal(cartData.selectedTotal || normalizedItems.filter(i => i.isSelected).reduce((acc, curr) => acc + curr.price * curr.qty, 0));
     setTotalItems(normalizedItems.reduce((acc, curr) => acc + curr.qty, 0));
-    setSelectedItems(cartData.selectedCount ?? normalizedItems.filter(i => i.isSelected).reduce((acc, curr) => acc + curr.qty, 0));
+    setSelectedItems(cartData.selectedCount || normalizedItems.filter(i => i.isSelected).reduce((acc, curr) => acc + curr.qty, 0));
     setCartStoreId(cartData.storeId || null);
   }, []);
 

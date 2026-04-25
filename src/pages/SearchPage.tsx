@@ -8,7 +8,7 @@ import { SearchResultsSkeleton } from '../components/Skeleton';
 import api, { createCancelableRequest } from '../services/api';
 import { useDebounce } from '../hooks/useDebounce';
 
-const tabs = ['All', 'Products', 'Stores', 'Food', 'Pharmacy'];
+const tabs = ['All', 'Products', 'Stores'];
 const sortOpts = ['Relevance', 'Price: Low to High', 'Price: High to Low'];
 const trendingSearches = ['Milk', 'Biryani', 'Paracetamol', 'Charger', 'Dosa', 'Rice', 'Cake', 'Battery'];
 
@@ -40,6 +40,7 @@ export default function SearchPage() {
 
   // ── Fetch products from server with debounced query ──
   useEffect(() => {
+    let isCurrent = true;
     const fetchSearch = async () => {
       // Cancel previous in-flight request
       if (cancelRef.current) cancelRef.current.cancel();
@@ -48,11 +49,13 @@ export default function SearchPage() {
 
       try {
         setApiLoading(true);
-        const queryParams: Record<string, string> = { page: '1', limit: '20' };
+        const queryParams: Record<string, any> = { page: '1', limit: '20', t: Date.now() };
         if (debouncedQuery.trim()) queryParams.query = debouncedQuery.trim();
         if (catFilter) queryParams.category = catFilter;
 
         const res = await api.get('/products', { params: queryParams, signal: cancelable.signal });
+        if (!isCurrent) return;
+
         const data = res.data?.data || res.data;
 
         if (data?.products) {
@@ -63,17 +66,21 @@ export default function SearchPage() {
           setTotalCount(meta?.total || data.total || data.products.length);
         }
       } catch (err: any) {
+        if (!isCurrent) return;
         if (err?.code !== 'ERR_CANCELED') {
           console.error("Search API Error:", err);
         }
       } finally {
-        setApiLoading(false);
+        if (isCurrent) {
+          setApiLoading(false);
+        }
       }
     };
 
     fetchSearch();
 
     return () => {
+      isCurrent = false;
       if (cancelRef.current) cancelRef.current.cancel();
     };
   }, [debouncedQuery, catFilter]);
@@ -82,7 +89,7 @@ export default function SearchPage() {
   const loadMore = async () => {
     const nextPage = page + 1;
     try {
-      const queryParams: Record<string, string> = { page: String(nextPage), limit: '20' };
+      const queryParams: Record<string, any> = { page: String(nextPage), limit: '20', t: Date.now() };
       if (debouncedQuery.trim()) queryParams.query = debouncedQuery.trim();
       if (catFilter) queryParams.category = catFilter;
 
@@ -136,13 +143,10 @@ export default function SearchPage() {
   // ── Client-side sort/filter on already-fetched products ──
   const filteredProducts = useMemo(() => {
     let items = products;
-    if (tab === 'Food') items = items.filter(p => p.category === 'food');
-    if (tab === 'Pharmacy') items = items.filter(p => p.category === 'medicine');
-    if (tab === 'Products') items = items.filter(p => !['food'].includes(p.category));
     if (sortBy === 'Price: Low to High') items = [...items].sort((a, b) => a.price - b.price);
     if (sortBy === 'Price: High to Low') items = [...items].sort((a, b) => b.price - a.price);
     return items;
-  }, [tab, sortBy, products]);
+  }, [sortBy, products]);
 
   const filteredStores = useMemo(() => {
     if (tab !== 'All' && tab !== 'Stores') return [];
@@ -153,7 +157,7 @@ export default function SearchPage() {
     return Array.from(map.values());
   }, [tab, products]);
 
-  const hasResults = query.trim().length > 0;
+  const hasResults = query.trim().length > 0 || catFilter.length > 0;
 
   return (
     <div className="min-h-dvh bg-white pb-nav">
@@ -241,7 +245,7 @@ export default function SearchPage() {
                   <h3 className="text-sm font-semibold text-gray-800 mb-3">Browse Categories</h3>
                   <div className="grid grid-cols-5 gap-2">
                     {categories.map(c => (
-                      <button key={c.id} onClick={() => { navigate(`/search?category=${c.id}`); setQuery(c.name); }}
+                      <button key={c.id} onClick={() => { navigate(`/search?category=${encodeURIComponent(c.name)}`); setQuery(c.name); }}
                         className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-gray-50">
                         <span className="text-xl">{c.icon}</span>
                         <span className="text-[9px] font-medium text-gray-500 text-center">{c.name}</span>

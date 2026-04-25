@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { getCategoryList } from '../config/categoryConfig';
 import { ProductCard, StoreCard } from '../components/Cards';
+import { HomePageSkeleton } from '../components/Skeleton';
 import api from '../services/api';
 
 // ── Inline UI constants — promotional banners (frontend layout config) ──
@@ -94,10 +95,10 @@ export default function HomePage() {
 
   // Derive views from real database products
   const trending = products.slice(0, 8);
-  const foodItems = products.filter(p => p.category.toLowerCase() === 'food').slice(0, 6);
-  const pharma = products.filter(p => p.category.toLowerCase() === 'medicine').slice(0, 4);
-  const elec = products.filter(p => p.category.toLowerCase() === 'electronics').slice(0, 4);
-  const grocery = products.filter(p => p.category.toLowerCase() === 'grocery').slice(0, 4);
+  const dairyItems = products.filter(p => p.category.toLowerCase().includes('dairy') || p.category.toLowerCase().includes('bakery')).slice(0, 6);
+  const beverageItems = products.filter(p => p.category.toLowerCase().includes('beverage')).slice(0, 6);
+  const snackItems = products.filter(p => p.category.toLowerCase().includes('snack')).slice(0, 6);
+  const kitchenItems = products.filter(p => p.category.toLowerCase().includes('kitchen')).slice(0, 6);
   
   // Extract unique stores directly from the available products safely
   const map = new Map();
@@ -124,18 +125,7 @@ export default function HomePage() {
   };
 
   if (loading) {
-// ... existing loading code
-    return (
-      <div className="min-h-dvh bg-white pb-nav">
-        <div className="px-4 pt-6 space-y-4">
-          <div className="animate-pulse bg-gray-200 h-16 rounded-2xl w-full" />
-          <div className="animate-pulse bg-gray-200 h-12 rounded-2xl w-full" />
-          <div className="flex gap-3 overflow-hidden">{[1, 2, 3, 4, 5].map(i => <div key={i} className="animate-pulse bg-gray-200 h-20 w-20 rounded-2xl flex-shrink-0" />)}</div>
-          <div className="animate-pulse bg-gray-200 h-36 rounded-2xl w-full" />
-          <div className="flex gap-3 overflow-hidden">{[1, 2, 3].map(i => <div key={i} className="animate-pulse bg-gray-200 h-48 w-40 rounded-2xl flex-shrink-0" />)}</div>
-        </div>
-      </div>
-    );
+    return <HomePageSkeleton />;
   }
 
   return (
@@ -178,6 +168,30 @@ export default function HomePage() {
 
       <div className="px-4 mt-5 space-y-6">
 
+        {/* Categories Grid/Scroll */}
+        <Section title={t('Explore Categories')}>
+          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+            {categories.map(cat => (
+              <motion.button
+                key={cat.id}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
+                className="flex flex-col items-center gap-2 flex-shrink-0"
+              >
+                <div 
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-gray-50"
+                  style={{ backgroundColor: cat.bgColor }}
+                >
+                  {cat.icon}
+                </div>
+                <span className="text-[10px] font-bold text-gray-600 text-center w-16 leading-tight">
+                  {t(cat.name)}
+                </span>
+              </motion.button>
+            ))}
+          </div>
+        </Section>
+
         {/* AI Suggestion Box */}
         <div className="bg-orange-50 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -214,34 +228,34 @@ export default function HomePage() {
         )}
 
         {/* General items */}
-        {foodItems.length > 0 && (
-          <Section title={t('🍽️ Restaurant Dishes')} onSeeAll={() => navigate('/search?category=food')}>
+        {dairyItems.length > 0 && (
+          <Section title={t('🥛 Dairy & Bakery')} onSeeAll={() => navigate(`/search?category=${encodeURIComponent('Dairy & Bakery')}`)}>
             <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
-              {foodItems.map(p => <ProductCard key={p.id} product={p} compact />)}
+              {dairyItems.map(p => <ProductCard key={p.id} product={p} compact />)}
             </div>
           </Section>
         )}
 
-        {pharma.length > 0 && (
-          <Section title={t('💊 Pharmacy Essentials')} onSeeAll={() => navigate('/search?category=medicine')}>
+        {beverageItems.length > 0 && (
+          <Section title={t('🧃 Refreshing Beverages')} onSeeAll={() => navigate(`/search?category=Beverages`)}>
             <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
-              {pharma.map(p => <ProductCard key={p.id} product={p} compact />)}
+              {beverageItems.map(p => <ProductCard key={p.id} product={p} compact />)}
             </div>
           </Section>
         )}
 
-        {elec.length > 0 && (
-          <Section title={t('📱 Electronics Picks')} onSeeAll={() => navigate('/search?category=electronics')}>
+        {snackItems.length > 0 && (
+          <Section title={t('🍿 Munchies & Snacks')} onSeeAll={() => navigate(`/search?category=${encodeURIComponent('Snacks & Branded Foods')}`)}>
             <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
-              {elec.map(p => <ProductCard key={p.id} product={p} compact />)}
+              {snackItems.map(p => <ProductCard key={p.id} product={p} compact />)}
             </div>
           </Section>
         )}
 
-        {grocery.length > 0 && (
-          <Section title={t('🛒 Grocery Essentials')} onSeeAll={() => navigate('/search?category=grocery')}>
+        {kitchenItems.length > 0 && (
+          <Section title={t('🍳 Kitchen Essentials')} onSeeAll={() => navigate(`/search?category=${encodeURIComponent('Kitchen & Household')}`)}>
             <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 snap-x">
-              {grocery.map(p => <ProductCard key={p.id} product={p} compact />)}
+              {kitchenItems.map(p => <ProductCard key={p.id} product={p} compact />)}
             </div>
           </Section>
         )}

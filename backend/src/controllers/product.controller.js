@@ -101,6 +101,7 @@ const getAllProducts = async (req, res) => {
     }
 
     if (category && typeof category === "string" && category.trim().length > 0) {
+      console.log(`[DEBUG] Filtering by category: "${category.trim()}"`);
       where.category = { equals: category.trim(), mode: "insensitive" };
     }
 

@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from './Toast';
 import { getProductImage } from '../utils/imageResolver';
+import { getCategoryDisplay } from '../config/categoryConfig';
 
 export function ProductCard({ product, compact }: { product: any; compact?: boolean }) {
   const navigate = useNavigate();
@@ -44,6 +45,9 @@ export function ProductCard({ product, compact }: { product: any; compact?: bool
           <div className="flex items-center gap-1.5 mt-1.5">
             <span className="text-sm font-extrabold text-orange-600">₹{product.price}</span>
             {discount > 0 && <span className="text-[10px] text-gray-300 line-through">₹{mrp}</span>}
+          </div>
+          <div className="mt-2 flex items-center gap-1 opacity-60">
+            <span className="text-[9px] font-bold text-gray-500 uppercase">{getCategoryDisplay(product.category).icon} {product.category}</span>
           </div>
         </div>
         <button onClick={handleAdd} className="mt-3 w-full bg-orange-500 text-white text-[11px] font-bold py-2 rounded-xl active:scale-95 transition-all flex items-center justify-center gap-1.5">
@@ -94,8 +98,9 @@ export function ProductCard({ product, compact }: { product: any; compact?: bool
             {inStock ? 'IN STOCK' : 'OUT OF STOCK'}
           </span>
         </div>
-        <p className="text-[10px] text-gray-400 mt-2 font-medium flex items-center gap-1">
-          <MapPin size={10} /> {storeName}
+        <p className="text-[10px] text-gray-400 mt-2 font-medium flex items-center justify-between gap-1">
+          <span className="flex items-center gap-1"><MapPin size={10} /> {storeName}</span>
+          <span className="bg-gray-100 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase text-gray-500">{getCategoryDisplay(product.category).icon} {product.category}</span>
         </p>
       </div>
       <button onClick={handleAdd} disabled={!inStock} 

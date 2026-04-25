@@ -1,9 +1,7 @@
 /**
  * Category UI Display Configuration
  *
- * Pure frontend display config — emoji icons, hex colors, background colors.
- * The actual list of available categories comes from the database via the API.
- * This mapping provides the visual representation for each known category ID.
+ * These names MUST match the GROCERY_CATEGORIES list in the backend categorizer.
  */
 
 export interface CategoryDisplayConfig {
@@ -15,28 +13,36 @@ export interface CategoryDisplayConfig {
 }
 
 export const CATEGORY_CONFIG: Record<string, CategoryDisplayConfig> = {
-  grocery:     { id: 'grocery',     name: 'Groceries',     icon: '🛒', color: '#16a34a', bgColor: '#dcfce7' },
-  food:        { id: 'food',        name: 'Food',          icon: '🍽️', color: '#f97316', bgColor: '#fff7ed' },
-  medicine:    { id: 'medicine',    name: 'Medicine',      icon: '💊', color: '#3b82f6', bgColor: '#eff6ff' },
-  electronics: { id: 'electronics', name: 'Electronics',   icon: '📱', color: '#8b5cf6', bgColor: '#f5f3ff' },
-  bakery:      { id: 'bakery',      name: 'Bakery',        icon: '🥐', color: '#ca8a04', bgColor: '#fefce8' },
-  fruits:      { id: 'fruits',      name: 'Fruits & Veg',  icon: '🥦', color: '#22c55e', bgColor: '#f0fdf4' },
-  hardware:    { id: 'hardware',    name: 'Hardware',      icon: '🔧', color: '#78716c', bgColor: '#f5f5f4' },
-  stationery:  { id: 'stationery',  name: 'Stationery',    icon: '✏️', color: '#ec4899', bgColor: '#fdf2f8' },
-  dairy:       { id: 'dairy',       name: 'Dairy',         icon: '🥛', color: '#0ea5e9', bgColor: '#f0f9ff' },
-  snacks:      { id: 'snacks',      name: 'Snacks',        icon: '🍿', color: '#f59e0b', bgColor: '#fffbeb' },
+  "Fruits & Vegetables": { id: 'fruits', name: 'Fruits & Vegetables', icon: '🥦', color: '#16a34a', bgColor: '#dcfce7' },
+  "Dairy & Bakery": { id: 'dairy', name: 'Dairy & Bakery', icon: '🥐', color: '#ca8a04', bgColor: '#fefce8' },
+  "Beverages": { id: 'beverages', name: 'Beverages', icon: '🧃', color: '#0ea5e9', bgColor: '#f0f9ff' },
+  "Snacks & Branded Foods": { id: 'snacks', name: 'Snacks & Branded Foods', icon: '🍿', color: '#f59e0b', bgColor: '#fffbeb' },
+  "Kitchen & Household": { id: 'kitchen', name: 'Kitchen & Household', icon: '🍳', color: '#78716c', bgColor: '#f5f5f4' },
+  "Beauty & Hygiene": { id: 'beauty', name: 'Beauty & Hygiene', icon: '🧴', color: '#ec4899', bgColor: '#fdf2f8' },
+  "Gourmet & World Food": { id: 'gourmet', name: 'Gourmet & World Food', icon: '🧀', color: '#8b5cf6', bgColor: '#f5f3ff' },
+  "Baby Care": { id: 'baby', name: 'Baby Care', icon: '🍼', color: '#f43f5e', bgColor: '#fff1f2' },
+  "Meat & Eggs": { id: 'meat', name: 'Meat & Eggs', icon: '🥩', color: '#ef4444', bgColor: '#fef2f2' },
+  "Cleaning & Household": { id: 'cleaning', name: 'Cleaning & Household', icon: '🧹', color: '#6366f1', bgColor: '#eef2ff' },
+  "Health & Wellness": { id: 'health', name: 'Health & Wellness', icon: '💊', color: '#3b82f6', bgColor: '#eff6ff' },
+  "Instant Food & Ready to Cook": { id: 'instant', name: 'Instant Food & Ready to Cook', icon: '🍜', color: '#f97316', bgColor: '#fff7ed' },
+  "Pet Care": { id: 'pet', name: 'Pet Care', icon: '🐾', color: '#10b981', bgColor: '#ecfdf5' },
+  "Stationery": { id: 'stationery', name: 'Stationery', icon: '✏️', color: '#71717a', bgColor: '#f4f4f5' },
+  "Food": { id: 'food', name: 'Food', icon: '🍽️', color: '#f97316', bgColor: '#fff7ed' },
+  "Electronics": { id: 'electronics', name: 'Electronics', icon: '📱', color: '#8b5cf6', bgColor: '#f5f3ff' },
 };
 
-/** Get all categories as an ordered array for rendering */
 export const getCategoryList = (): CategoryDisplayConfig[] =>
   Object.values(CATEGORY_CONFIG);
 
-/** Get display config for a single category, with a sensible default */
-export const getCategoryDisplay = (categoryId: string): CategoryDisplayConfig =>
-  CATEGORY_CONFIG[categoryId] || {
-    id: categoryId,
-    name: categoryId.charAt(0).toUpperCase() + categoryId.slice(1),
+export const getCategoryDisplay = (categoryName: string): CategoryDisplayConfig => {
+  if (!categoryName) return { id: 'none', name: '', icon: '', color: '', bgColor: '' };
+  
+  const key = Object.keys(CATEGORY_CONFIG).find(k => k.toLowerCase() === categoryName.toLowerCase());
+  return key ? CATEGORY_CONFIG[key] : {
+    id: categoryName,
+    name: categoryName,
     icon: '📦',
     color: '#6b7280',
     bgColor: '#f3f4f6',
   };
+};

@@ -2,6 +2,7 @@ const prisma = require("../config/db");
 const cache = require("../utils/cache");
 const logger = require("../utils/logger");
 const { sendSuccess, sendError } = require("../utils/response");
+const { categorizeProduct } = require("../utils/categorizer");
 
 // ─── POST /vendor/store — Create Store ───
 const createStore = async (req, res) => {
@@ -128,8 +129,8 @@ const createProduct = async (req, res) => {
   try {
     const { name, description, basePrice, profitMargin, category, stock } = req.body;
 
-    if (!name || !description || basePrice === undefined || !category) {
-      return sendError(res, 400, "Name, description, basePrice, and category are required.");
+    if (!name || !description || basePrice === undefined) {
+      return sendError(res, 400, "Name, description, and basePrice are required.");
     }
     if (typeof name !== "string" || name.trim().length < 2) return sendError(res, 400, "Product name must be at least 2 characters.");
     if (typeof description !== "string" || description.trim().length < 5) return sendError(res, 400, "Description must be at least 5 characters.");
@@ -140,7 +141,12 @@ const createProduct = async (req, res) => {
     const parsedMargin = profitMargin !== undefined ? parseFloat(profitMargin) : 0;
     if (isNaN(parsedMargin) || parsedMargin < 0 || parsedMargin > 500) return sendError(res, 400, "Profit margin must be between 0 and 500%.");
 
-    if (typeof category !== "string" || category.trim().length < 2) return sendError(res, 400, "Category must be at least 2 characters.");
+    let finalCategory = category;
+    if (!category || (typeof category === "string" && category.trim().toLowerCase() === "auto")) {
+      finalCategory = await categorizeProduct(name);
+    } else if (typeof category !== "string" || category.trim().length < 2) {
+      return sendError(res, 400, "Category must be at least 2 characters.");
+    }
 
     const parsedStock = stock !== undefined ? parseInt(stock, 10) : 0;
     if (isNaN(parsedStock) || parsedStock < 0) return sendError(res, 400, "Stock must be a non-negative integer.");
@@ -160,7 +166,7 @@ const createProduct = async (req, res) => {
         basePrice: parsedBasePrice,
         profitMargin: parsedMargin,
         price: sellingPrice,
-        category: category.trim().toLowerCase(),
+        category: finalCategory.trim(),
         stock: parsedStock,
         isAvailable: parsedStock > 0,
         storeId: store.id,
@@ -244,8 +250,13 @@ const updateProduct = async (req, res) => {
       updateData.price = Math.round((finalBase + (finalBase * finalMargin / 100)) * 100) / 100;
     }
     if (category !== undefined) {
-      if (typeof category !== "string" || category.trim().length < 2) return sendError(res, 400, "Category must be at least 2 characters.");
-      updateData.category = category.trim().toLowerCase();
+      if (category.trim().toLowerCase() === "auto") {
+        updateData.category = await categorizeProduct(name ?? existingProduct.name);
+      } else if (typeof category !== "string" || category.trim().length < 2) {
+        return sendError(res, 400, "Category must be at least 2 characters.");
+      } else {
+        updateData.category = category.trim();
+      }
     }
     if (isAvailable !== undefined) {
       if (typeof isAvailable !== "boolean") return sendError(res, 400, "isAvailable must be a boolean.");

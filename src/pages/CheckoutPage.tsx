@@ -25,37 +25,105 @@ export default function CheckoutPage() {
   const charges = Math.round(selectedSubtotal * 0.02);
   const total = selectedSubtotal + charges;
 
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) return resolve(true);
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleConfirm = async () => {
     if (selectedItems === 0) return alert(items.length === 0 ? "Your cart is empty!" : "Select items to proceed.");
+    if (!name.trim() || !phone.trim()) return alert("Please enter pickup person details.");
     
     try {
       setLoading(true);
-      const res = await api.post('/orders');
       
-      // Handle standardized response format
-      const data = res.data?.data || res.data;
-      if (data?.order) {
-        const order = data.order;
-        await fetchCart(); 
+      if (payment === 'store') {
+        const res = await api.post('/orders');
+        const data = res.data?.data || res.data;
+        if (data?.order) {
+          const order = data.order;
+          await fetchCart(); 
+          navigate('/order-success', { 
+            state: { orderId: order.id.slice(0, 8).toUpperCase(), storeName: 'Local Store', pickupTime: slot, total: order.totalAmount, items: selectedItems }, 
+            replace: true 
+          });
+        }
+      } else {
+        // ── Razorpay Online Payment Flow ──
+        const isLoaded = await loadRazorpay();
+        if (!isLoaded) {
+          alert("Failed to load payment gateway. Please check your internet connection.");
+          setLoading(false);
+          return;
+        }
+
+        const res = await api.post('/payment/razorpay-order');
+        const rzpOrder = res.data?.data || res.data;
+
+        const options = {
+          key: rzpOrder.keyId,
+          amount: rzpOrder.amount,
+          currency: rzpOrder.currency,
+          name: "Prizzo",
+          description: "Grocery Order",
+          order_id: rzpOrder.razorpayOrderId,
+          handler: async function (response: any) {
+            try {
+              setLoading(true);
+              // Verify payment
+              await api.post('/payment/verify', {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature
+              });
+              
+              // Proceed with Prizzo checkout
+              const createRes = await api.post('/orders');
+              const data = createRes.data?.data || createRes.data;
+              if (data?.order) {
+                const order = data.order;
+                await fetchCart(); 
+                navigate('/order-success', { 
+                  state: { orderId: order.id.slice(0, 8).toUpperCase(), storeName: 'Local Store', pickupTime: slot, total: order.totalAmount, items: selectedItems }, 
+                  replace: true 
+                });
+              }
+            } catch (err: any) {
+              console.error(err);
+              alert(err.response?.data?.error || "Order creation failed after payment. Please contact support.");
+            } finally {
+              setLoading(false);
+            }
+          },
+          prefill: {
+            name: name,
+            contact: phone,
+          },
+          theme: { color: "#f97316" }
+        };
         
-        navigate('/order-success', { 
-          state: { 
-            orderId: order.id.slice(0, 8).toUpperCase(), 
-            storeName: 'Local Store', 
-            pickupTime: slot, 
-            total: order.totalAmount, 
-            items: selectedItems
-          }, 
-          replace: true 
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (response: any){
+          alert("Payment failed: " + response.error.description);
         });
+        rzp.open();
       }
     } catch (error: any) {
       alert(error.response?.data?.error || "Checkout failed. Please try again.");
-      await fetchCart(); // Sync frontend with backend to fix stale cart state
+      await fetchCart(); 
     } finally {
-      setLoading(false);
+      if (payment === 'store') setLoading(false);
+      // For Razorpay, loading is stopped when the overlay opens so user can interact
+      else setLoading(false); 
     }
   };
+
 
   return (
     <div className="min-h-dvh bg-gray-50 pb-48">

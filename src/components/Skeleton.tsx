@@ -268,3 +268,68 @@ export function SearchResultsSkeleton() {
     </div>
   );
 }
+
+// ── Home Page Skeleton ──
+export function HomePageSkeleton() {
+  return (
+    <div className="min-h-dvh bg-white pb-nav">
+      {/* Header Skeleton */}
+      <div className="bg-gradient-to-br from-orange-400 to-orange-500 px-4 pt-5 pb-6 rounded-b-[1.5rem] relative overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-20 bg-white/30" />
+            <Skeleton className="h-5 w-32 bg-white/40" />
+          </div>
+          <Skeleton className="w-9 h-9 rounded-xl bg-white/30" />
+        </div>
+        <Skeleton className="h-3 w-40 mb-3 bg-white/30" />
+        <Skeleton className="h-12 w-full bg-white rounded-2xl" />
+      </div>
+
+      <div className="px-4 mt-5 space-y-6">
+        {/* Categories Skeleton */}
+        <div>
+          <Skeleton className="h-5 w-36 mb-3" />
+          <div className="flex gap-4 overflow-hidden">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0">
+                <Skeleton className="w-16 h-16 rounded-2xl" />
+                <Skeleton className="h-2 w-12" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* AI Suggestion Box Skeleton */}
+        <div className="bg-orange-50 rounded-2xl p-4 space-y-3">
+          <Skeleton className="h-5 w-48" />
+          <div className="flex gap-2 flex-wrap">
+            <Skeleton className="h-8 w-32 rounded-xl" />
+            <Skeleton className="h-8 w-24 rounded-xl" />
+            <Skeleton className="h-8 w-36 rounded-xl" />
+          </div>
+        </div>
+
+        {/* Product Sections Skeleton */}
+        {[1, 2, 3].map(section => (
+          <div key={section}>
+            <div className="flex items-center justify-between mb-3">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-12" />
+            </div>
+            <div className="flex gap-3 overflow-hidden">
+              {[1, 2, 3].map(card => (
+                <div key={card} className="w-[160px] h-56 rounded-2xl bg-gray-100 p-3 flex-shrink-0 flex flex-col">
+                  <Skeleton className="w-full h-24 rounded-xl mb-2" />
+                  <Skeleton className="h-2 w-16 mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-5 w-16 mt-auto" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

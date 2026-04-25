@@ -23,6 +23,7 @@ const vendorRoutes = require("./routes/vendor.routes");
 const productRoutes = require("./routes/product.routes");
 const cartRoutes = require("./routes/cart.routes");
 const orderRoutes = require("./routes/order.routes");
+const paymentRoutes = require("./routes/payment.routes");
 const storeRoutes = require("./routes/store.routes");
 const adminRoutes = require("./routes/admin.routes");
 const aiRoutes = require("./routes/ai.routes");
@@ -121,6 +122,7 @@ app.use("/vendor", vendorRoutes);
 app.use("/products", productRoutes);
 app.use("/cart", cartRoutes);
 app.use("/orders", orderRoutes);
+app.use("/payment", paymentRoutes);
 app.use("/stores", storeRoutes);
 app.use("/admin", adminLimiter, adminRoutes);
 app.use("/ai", aiRoutes);
@@ -254,3 +256,5 @@ process.on("unhandledRejection", (reason, promise) => {
   // We don't necessarily need to crash the whole app for a rejected promise.
   // Just log it and monitor.
 });
+
+

@@ -15,8 +15,8 @@ const SYSTEM_PROMPT = `You are a product search intent parser. You are NOT a cha
 Your ONLY job: parse user input into a JSON action object. Return ONLY valid JSON, nothing else.
 
 Supported intents:
-- nearby_search — user wants to find products NEAR THEM (keywords: near me, nearby, around me, within, closest, near)
-- search_product — user wants to find/search/look for a product (no location keywords)
+- nearby_search — user wants to find products NEAR THEM (keywords: near me, nearby, I need, where is, around me, within, closest, near)
+- search_product — user wants to find/search/look for a product (general search)
 - compare_prices — user wants to compare prices, find cheapest, best price, best deal
 - smart_buy — user wants to buy/order/purchase a product instantly
 - add_to_cart — user wants to add a product to cart
@@ -47,11 +47,13 @@ More examples:
 "my orders" → {"intent":"track_order","query":"","quantity":1}
 "cheapest dosa nearby" → {"intent":"nearby_search","query":"dosa","quantity":1}
 "paracetamol around me" → {"intent":"nearby_search","query":"paracetamol","quantity":1}
-"find stores near me selling rice" → {"intent":"nearby_search","query":"rice","quantity":1}`;
+"find stores near me selling rice" → {"intent":"nearby_search","query":"rice","quantity":1}
+"I need milk" → {"intent":"nearby_search","query":"milk","quantity":1}
+"where is bread" → {"intent":"nearby_search","query":"bread","quantity":1}`;
 
 // ── Location keyword patterns ──
-const NEARBY_PATTERN = /\b(near\s*me|nearby|around\s*me|within\s*\d*\s*km|closest|near\s*by|near\b)/i;
-const LOCATION_STRIP_PATTERN = /\b(near\s*me|nearby|around\s*me|within\s*\d*\s*km|closest|near\s*by|near|stores?|find|show|selling)\b/gi;
+const NEARBY_PATTERN = /\b(near\s*me|nearby|around\s*me|within\s*\d*\s*km|closest|near\s*by|near|i\s*need|need|i\s*want|want|where\s*is|find|show\s*me|get\s*me|search\s*for)\b/i;
+const LOCATION_STRIP_PATTERN = /\b(near\s*me|nearby|around\s*me|within\s*\d*\s*km|closest|near\s*by|near|stores?|find|show|selling|i\s*need|need|i\s*want|want|where\s*is|show\s*me|get\s*me|search\s*for|please|can\s*you|any)\b/gi;
 
 // ── Keyword-based fallback intent detection (no AI needed) ──
 function detectIntentFromKeywords(message) {
@@ -94,8 +96,9 @@ function detectIntentFromKeywords(message) {
     }
   }
 
-  // Default: treat entire message as a product search
-  return { intent: "search_product", query: msg, quantity: 1 };
+  // Default: treat message as product search but strip stop words
+  const cleanQuery = msg.replace(LOCATION_STRIP_PATTERN, "").replace(/\s+/g, " ").trim();
+  return { intent: "search_product", query: cleanQuery || msg, quantity: 1 };
 }
 
 // ── Context-recall detection (includes "buy this", "order this", "add this") ──
@@ -134,7 +137,7 @@ async function executeIntent(intent, query, quantity, userId, lat, lng) {
           lat: parseFloat(lat), lng: parseFloat(lng),
           radius: 3, query,
         });
-        const sorted = sortResults(scored, "best");
+        const sorted = sortResults(scored, "cheapest");
         const results = sorted.slice(0, 6);
 
         if (results.length > 0) {
